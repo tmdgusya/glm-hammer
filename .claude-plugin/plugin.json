@@ -1,0 +1,22 @@
+{
+  "name": "glm-hammer",
+  "description": "Forge-and-hammer engineering harness: recon-first strong planning verified by a 3-critic panel, and a worker-validator-critic implementation loop with security/QA review gates enforced by hooks.",
+  "version": "0.1.0",
+  "author": {
+    "name": "tmdgusya",
+    "url": "https://github.com/tmdgusya"
+  },
+  "repository": "https://github.com/tmdgusya/glm-hammer",
+  "license": "MIT",
+  "keywords": [
+    "planning",
+    "critic",
+    "worker-validator",
+    "hooks",
+    "engineering-discipline",
+    "review",
+    "security",
+    "qa",
+    "loop"
+  ]
+}

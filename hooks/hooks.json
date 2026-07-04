@@ -1,0 +1,71 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.js"],
+            "timeoutMs": 10000,
+            "statusMessage": "(glm-hammer) Checking for unfinished runs"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/route-intent.js"],
+            "timeoutMs": 10000,
+            "statusMessage": "(glm-hammer) Routing intent"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/plan-gate.js"],
+            "timeoutMs": 10000,
+            "statusMessage": "(glm-hammer) Plan integrity gate"
+          },
+          {
+            "type": "process",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/comment-checker.js"],
+            "timeoutMs": 10000,
+            "statusMessage": "(glm-hammer) Checking comments"
+          },
+          {
+            "type": "process",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/edit-diagnostics.js"],
+            "timeoutMs": 15000,
+            "statusMessage": "(glm-hammer) Syntax diagnostics"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop-gate.js"],
+            "timeoutMs": 15000,
+            "statusMessage": "(glm-hammer) Verifying gates and evidence receipts"
+          }
+        ]
+      }
+    ]
+  }
+}
