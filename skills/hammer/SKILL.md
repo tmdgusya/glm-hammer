@@ -25,8 +25,9 @@ All judges answer **fixed binary checklists** (YES/NO per question, verdict = AN
    - implementation-critic → `evidence/tasks/task-<i>/critic.md` (must contain `VERDICT: APPROVE`)
    - E2E gate → you (the orchestrator) save the raw command output to `evidence/e2e.md`
    - reviewers → `evidence/reviews/security.md` / `evidence/reviews/qa.md` (must contain `VERDICT: PASS`)
-   Before advancing state, confirm the receipt exists and matches the reported verdict. `<i>` is the plan's task number.
-7. **Keep `.glm-hammer/state.json` current** at every ⟨state⟩ checkpoint.
+   Before advancing state, confirm the receipt exists and matches the reported verdict. `<i>` is the plan's task number. Receipts are also checked for substance (a `CHECKS:` block + real content, not a bare verdict line) and must be **dispatch-backed**: the judge's dispatch prompt must contain its evidence path — the hooks record every subagent dispatch and reject receipts no judge was pointed at. Writing a judge's receipt yourself therefore does not work.
+7. **Plan edits go through the Write/Edit tools only.** The plan file is content-sealed on every tracked write; editing it via Bash (shell redirection, sed, heredoc) breaks the seal and the Stop hook will refuse to close the run until the plan is re-saved via Write.
+8. **Keep `.glm-hammer/state.json` current** at every ⟨state⟩ checkpoint.
 
 ## State Protocol
 
@@ -81,9 +82,10 @@ and ran, never a holistic impression. Verdict = AND of all criteria. No
 partial credit. If FAIL, state exactly which criteria failed, with file
 paths — describe, don't fix.
 
-Write your full report (verdict line first: "VERDICT: PASS" or
-"VERDICT: FAIL", then per-criterion results and what you ran) to
-{EVIDENCE_PATH}, creating parent directories. End your final message with:
+Write your full report to {EVIDENCE_PATH} (create parent directories):
+a "CHECKS:" block listing every criterion with PASS|FAIL and one-line
+evidence of what you ran or read, then the line "VERDICT: PASS" or
+"VERDICT: FAIL". End your final message with:
 EVIDENCE_RECORDED: {EVIDENCE_PATH}
 ```
 

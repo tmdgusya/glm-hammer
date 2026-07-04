@@ -33,7 +33,8 @@ hooks는 서브에이전트를 직접 띄울 수 없으므로, 스킬이 `.glm-h
 |---|---|---|
 | `session-start.js` | SessionStart | 미완료 런이 있으면 재개 브리핑 주입 — 재시작/clear/컴팩션 후에도 "continue" 없이 루프 자동 복귀 |
 | `route-intent.js` | UserPromptSubmit | 작업 요청으로 보이면 forge/blueprint/hammer 라우팅 지침 주입. 진행 중인 런이 있으면 현재 상태를 주입해 루프 복귀 유도 |
-| `plan-gate.js` | PostToolUse (Write\|Edit) | forge 중 계획 파일이 수정되면 **critic 승인을 0으로 리셋** → 전체 패널 재심사 강제. hammer 중 수정이면 Plan Amendment Log 기록 요구 |
+| `plan-gate.js` | PostToolUse (Write\|Edit) | 계획 파일 저장 시 **콘텐츠 실(seal, sha256) 기록**. forge 중 수정이면 critic 승인 0 리셋 → 전체 패널 재심사 강제. hammer 중이면 Amendment Log 기록 요구 |
+| `dispatch-log.js` | PostToolUse (Agent\|Task) | 서브에이전트 디스패치 원장 — 디스패치 입력에 언급된 evidence 경로를 기록. stop-gate가 영수증의 디스패치 근거를 대조 |
 | `comment-checker.js` | PostToolUse (Write\|Edit) | 방금 수정한 파일에서 AI 슬롭 주석 탐지: **elision 마커**("... existing code ..." — 파일 손상 신호), 변경 나레이션 주석("// added X"), placeholder 주석. 발견 즉시 같은 턴에서 수정 지시 |
 | `edit-diagnostics.js` | PostToolUse (Write\|Edit) | LSP-lite: 수정 파일에 빠른 구문 검사(JS `node --check`, JSON parse, Python `py_compile`) — 깨진 파일을 E2E 게이트가 아니라 **수정 직후** 잡아냄 |
 | `stop-gate.js` | Stop | state의 주장과 **증거 영수증을 대조**해 턴 종료를 차단. `awaiting-user`(정당한 에스컬레이션)만 통과 |
@@ -73,6 +74,12 @@ state.json의 완료 주장은 신뢰하지 않습니다. 모든 판정자(criti
 
 영수증 없는 완료 주장은 차단되고, 반복될수록 directive 톤이 강해집니다.
 (lazycodex의 executor-verify 패턴 이식)
+
+여기에 3중 방어선이 추가로 얹혀 있습니다:
+
+1. **실질 검사** — 영수증은 최소 분량 + `CHECKS:` 블록 + `VERDICT:` 라인을 갖춰야 유효. 한 줄짜리 "VERDICT: PASS"는 통하지 않음
+2. **콘텐츠 실(seal)** — 계획 파일은 Write/Edit 도구 저장 시 sha256으로 실링. Bash 리다이렉션·sed 등 우회 경로로 고치면 실이 깨져 승인 전체 무효
+3. **디스패치 원장** — 판정자 영수증은 실제 Agent 디스패치가 그 경로를 언급한 기록이 있어야 유효. 오케스트레이터가 영수증을 직접 써넣는 위조 차단 (원장에 기록이 하나라도 있어야 강제되는 fail-open 설계 — 런타임이 Agent 이벤트를 안 쏘면 자동 비활성)
 
 무한 루프 방지: 차단 6회 시 양보(다음 사용자 턴/세션에서 카운터 리셋), Claude Code 자체 상한(연속 8회),
 그리고 트랜스크립트에 컨텍스트 압박 마커가 보이면 차단을 해제하는 탈출구가 있습니다.

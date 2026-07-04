@@ -1,10 +1,13 @@
 'use strict';
 // PostToolUse hook (Write|Edit|MultiEdit): plan integrity gate.
+// - every tracked write to a plan file RESEALS it (content hash). stop-gate
+//   compares the live file against the seal, so edits smuggled through Bash
+//   or any untracked route break the seal and void approvals.
 // - forge phase: any edit to the plan file invalidates critic approvals — the full
 //   panel must re-run. This makes "revise then re-critique" mechanical, not optional.
 // - hammer phase: plan edits are reminded to go through the Plan Amendment Log.
 const path = require('path');
-const { readStdin, readState, writeState, emitContext } = require('./lib');
+const { readStdin, readState, writeState, emitContext, writeSeal } = require('./lib');
 
 try {
   const input = readStdin();
@@ -15,6 +18,8 @@ try {
   const normalized = path.normalize(filePath).replace(/\\/g, '/');
   const isPlanFile = /docs\/glm-hammer\/plans\/[^/]+\.md$/i.test(normalized);
   if (!isPlanFile) process.exit(0);
+
+  writeSeal(cwd, filePath); // reseal on every tracked write, regardless of phase
 
   const state = readState(cwd);
   if (!state || !state.phase) process.exit(0);

@@ -52,6 +52,18 @@
             "statusMessage": "(glm-hammer) Syntax diagnostics"
           }
         ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/dispatch-log.js"],
+            "timeoutMs": 10000,
+            "statusMessage": "(glm-hammer) Recording dispatch ledger"
+          }
+        ]
       }
     ],
     "Stop": [

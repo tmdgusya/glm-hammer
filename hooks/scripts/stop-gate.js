@@ -1,18 +1,21 @@
 'use strict';
-// Stop hook: the loop-closer, with evidence gates (pattern borrowed from lazycodex).
+// Stop hook: the loop-closer, with three lines of defense:
 //
-// State claims are NOT trusted. Every gate cross-checks .glm-hammer/state.json
-// against evidence receipts on disk under .glm-hammer/evidence/:
-//   forge  → evidence/critics/round-<N>/<critic>.md   containing VERDICT: APPROVE  (×3)
-//   hammer → evidence/tasks/task-<i>/validator.md      containing VERDICT: PASS
-//            evidence/tasks/task-<i>/critic.md         containing VERDICT: APPROVE
-//            evidence/e2e.md                           (non-empty gate output)
-//            evidence/reviews/{security,qa}.md         containing VERDICT: PASS
-// A completion claim without its receipt blocks the stop, with escalating tone.
+//   1. EVIDENCE RECEIPTS — state claims are cross-checked against verdict files
+//      under .glm-hammer/evidence/ with substance requirements (min size +
+//      CHECKS block + VERDICT line). A one-line "VERDICT: PASS" is not evidence.
+//   2. PLAN SEAL — the plan's content hash must match the seal recorded by
+//      plan-gate on the last tracked Write/Edit. An edit smuggled through Bash
+//      or any untracked route breaks the seal and voids critic approvals.
+//   3. DISPATCH LEDGER — each receipt must be backed by a recorded Agent/Task
+//      dispatch that referenced its path (dispatch-log.js). A receipt no judge
+//      was ever pointed at was written by the orchestrator — it does not count.
+//      Fail-open: enforced only once the ledger has at least one entry, so a
+//      runtime whose Agent matcher never fires cannot deadlock the loop.
 //
-// Escape hatches: status "awaiting-user" / "done" (done still requires receipts),
-// context-pressure markers in the transcript, and a block cap (Claude Code also
-// force-stops after 8 consecutive blocks).
+// Escape hatches: status "awaiting-user" / context-pressure markers / block cap
+// (ZCode's runtime additionally caps Stop continuations at 3 per turn).
+const path = require('path');
 const {
   readStdin,
   readState,
@@ -20,6 +23,8 @@ const {
   evidencePath,
   evidenceOk,
   underContextPressure,
+  sealMatches,
+  readDispatchedTails,
   emit,
 } = require('./lib');
 
@@ -27,24 +32,84 @@ const BLOCK_CAP = 6;
 const CRITICS = ['feasibility-critic', 'integration-critic', 'coverage-critic'];
 const APPROVE = /VERDICT:\s*APPROVE/i;
 const PASS = /VERDICT:\s*PASS/i;
+const JUDGE = { minBytes: 300, requireChecks: true };
+
+function receiptProblems(cwd, entries) {
+  // entries: [{tail, pattern, kind}] — returns {missing:[], unbacked:[]}
+  const dispatched = readDispatchedTails(cwd);
+  const enforceDispatch = dispatched.size > 0;
+  const missing = [];
+  const unbacked = [];
+  for (const e of entries) {
+    const abs = evidencePath(cwd, ...e.tail.split('/'));
+    const opts = e.kind === 'raw' ? { minBytes: 20 } : { ...JUDGE, pattern: e.pattern };
+    if (!evidenceOk(abs, opts)) {
+      missing.push(e.tail);
+    } else if (enforceDispatch && e.kind !== 'raw' && !dispatched.has(e.tail.toLowerCase())) {
+      unbacked.push(e.tail);
+    }
+  }
+  return { missing, unbacked };
+}
+
+function substanceNote() {
+  return (
+    'A valid judge receipt has real substance: at least ~300 bytes with a CHECKS: block (binary answers with evidence) and the VERDICT line. '
+  );
+}
+
+function unbackedNote(unbacked) {
+  return (
+    `These receipts exist but NO recorded subagent dispatch ever referenced them: ${unbacked.join(', ')}. ` +
+    'Receipts must be written by the dispatched judge itself, not by you. Re-dispatch each judge with its evidence path in the prompt — the dispatch ledger records it automatically. '
+  );
+}
 
 function forgeGate(cwd, state) {
   const c = state.critics || { required: 3, approved: 0, round: 1 };
   const round = c.round || 1;
-  const missing = CRITICS.filter(
-    (name) => !evidenceOk(evidencePath(cwd, 'critics', `round-${round}`, `${name}.md`), APPROVE)
-  );
-  if ((c.approved || 0) >= (c.required || 3) && missing.length === 0) return null;
 
+  // Line of defense 2: plan seal
+  if (state.plan) {
+    const planAbs = path.resolve(cwd, state.plan);
+    const seal = sealMatches(cwd, planAbs);
+    if (seal !== 'ok') {
+      if ((c.approved || 0) > 0) {
+        c.approved = 0;
+        c.verdicts = [];
+        state.critics = c;
+        writeState(cwd, state);
+      }
+      return (
+        `Forge gate: the plan's content seal is ${seal === 'broken' ? 'BROKEN — the file changed outside tracked editing (e.g. via shell redirection)' : 'MISSING — the file was never saved through the Write/Edit tools'}. ` +
+        'Any critic approvals are void. Re-save the exact intended plan content via the Write tool (this reseals it), then re-run the FULL critic panel.'
+      );
+    }
+  }
+
+  // Lines of defense 1 & 3: receipts + dispatch backing
+  const entries = CRITICS.map((name) => ({
+    tail: `critics/round-${round}/${name}.md`,
+    pattern: APPROVE,
+    kind: 'judge',
+  }));
+  const { missing, unbacked } = receiptProblems(cwd, entries);
+
+  if ((c.approved || 0) >= (c.required || 3) && missing.length === 0 && unbacked.length === 0) {
+    return null;
+  }
+  if (unbacked.length > 0) {
+    return `Forge gate: ${unbackedNote(unbacked)}Approvals do not count until every receipt is dispatch-backed.`;
+  }
   if (missing.length > 0 && (c.approved || 0) >= (c.required || 3)) {
     return (
-      `Forge gate: state claims ${c.approved}/${c.required} critic approvals, but no APPROVE receipt exists on disk for: ${missing.join(', ')} ` +
-      `(expected .glm-hammer/evidence/critics/round-${round}/<critic>.md containing "VERDICT: APPROVE"). ` +
-      'Approval claims without evidence receipts are not trusted. Dispatch the missing critics; each must write its own verdict file and end with EVIDENCE_RECORDED: <path>.'
+      `Forge gate: state claims ${c.approved}/${c.required} critic approvals, but these receipts are missing, lack substance, or lack "VERDICT: APPROVE": ${missing.join(', ')} ` +
+      `(under .glm-hammer/evidence/, round ${round}). ${substanceNote()}` +
+      'Approval claims without valid receipts are not trusted. Dispatch the missing critics; each writes its own verdict file and ends with EVIDENCE_RECORDED: <path>.'
     );
   }
   return (
-    `Forge gate: critic panel incomplete — ${c.approved || 0}/${c.required || 3} APPROVE (round ${round}); missing receipts: ${missing.join(', ')}. ` +
+    `Forge gate: critic panel incomplete — ${c.approved || 0}/${c.required || 3} APPROVE (round ${round}); missing/invalid receipts: ${missing.join(', ')}. ` +
     'Dispatch the full panel (feasibility-critic, integration-critic, coverage-critic) on the current plan, or revise the plan and re-run the panel. ' +
     'If you are genuinely blocked on user input, set status to "awaiting-user" in .glm-hammer/state.json and ask the question.'
   );
@@ -62,19 +127,19 @@ function hammerGate(cwd, state) {
     );
   }
 
-  const missing = [];
+  const taskEntries = [];
   for (let i = 1; i <= (t.total || 0); i++) {
-    if (!evidenceOk(evidencePath(cwd, 'tasks', `task-${i}`, 'validator.md'), PASS)) {
-      missing.push(`tasks/task-${i}/validator.md (VERDICT: PASS)`);
-    }
-    if (!evidenceOk(evidencePath(cwd, 'tasks', `task-${i}`, 'critic.md'), APPROVE)) {
-      missing.push(`tasks/task-${i}/critic.md (VERDICT: APPROVE)`);
-    }
+    taskEntries.push({ tail: `tasks/task-${i}/validator.md`, pattern: PASS, kind: 'judge' });
+    taskEntries.push({ tail: `tasks/task-${i}/critic.md`, pattern: APPROVE, kind: 'judge' });
   }
-  if (missing.length > 0) {
+  const taskCheck = receiptProblems(cwd, taskEntries);
+  if (taskCheck.unbacked.length > 0) {
+    return `Hammer gate: ${unbackedNote(taskCheck.unbacked)}`;
+  }
+  if (taskCheck.missing.length > 0) {
     return (
-      `Hammer gate: state claims all ${t.total} tasks are complete, but these evidence receipts are missing or lack the required verdict under .glm-hammer/evidence/: ${missing.join('; ')}. ` +
-      'Completion claims without receipts are not trusted. Re-dispatch the validator/critic for each unevidenced task; each must write its own verdict file and end with EVIDENCE_RECORDED: <path>.'
+      `Hammer gate: state claims all ${t.total} tasks are complete, but these receipts are missing, lack substance, or lack the required verdict: ${taskCheck.missing.join('; ')}. ` +
+      `${substanceNote()}Completion claims without valid receipts are not trusted. Re-dispatch the validator/critic for each unevidenced task.`
     );
   }
 
@@ -86,15 +151,32 @@ function hammerGate(cwd, state) {
     );
   }
 
-  const reviewMissing = [];
-  if (!evidenceOk(evidencePath(cwd, 'e2e.md'))) reviewMissing.push('e2e.md (E2E gate output)');
-  if (!evidenceOk(evidencePath(cwd, 'reviews', 'security.md'), PASS)) reviewMissing.push('reviews/security.md (VERDICT: PASS)');
-  if (!evidenceOk(evidencePath(cwd, 'reviews', 'qa.md'), PASS)) reviewMissing.push('reviews/qa.md (VERDICT: PASS)');
-  if (reviewMissing.length > 0) {
+  const reviewEntries = [
+    { tail: 'e2e.md', kind: 'raw' },
+    { tail: 'reviews/security.md', pattern: PASS, kind: 'judge' },
+    { tail: 'reviews/qa.md', pattern: PASS, kind: 'judge' },
+  ];
+  const reviewCheck = receiptProblems(cwd, reviewEntries);
+  if (reviewCheck.unbacked.length > 0) {
+    return `Hammer gate: ${unbackedNote(reviewCheck.unbacked)}`;
+  }
+  if (reviewCheck.missing.length > 0) {
     return (
-      `Hammer gate: state claims reviews passed, but receipts are missing under .glm-hammer/evidence/: ${reviewMissing.join('; ')}. ` +
-      'A PASS you cannot show a receipt for did not happen. Re-run the E2E gate and/or re-dispatch the reviewers; each reviewer writes its own verdict file and ends with EVIDENCE_RECORDED: <path>.'
+      `Hammer gate: state claims reviews passed, but these receipts are missing or invalid: ${reviewCheck.missing.join('; ')}. ` +
+      `${substanceNote()}A PASS you cannot show a valid receipt for did not happen. Re-run the E2E gate and/or re-dispatch the reviewers.`
     );
+  }
+
+  // Plan seal on the amended plan (only when a seal exists — forge-created plans always have one)
+  if (state.plan) {
+    const planAbs = path.resolve(cwd, state.plan);
+    if (sealMatches(cwd, planAbs) === 'broken') {
+      return (
+        'Hammer gate: the plan file changed outside tracked editing (its content seal is broken). ' +
+        'Plan amendments must go through the Write/Edit tools with a Plan Amendment Log entry. ' +
+        'Re-save the intended plan content via the Write tool, verify the Amendment Log reflects reality, and re-check affected tasks.'
+      );
+    }
   }
   return null;
 }

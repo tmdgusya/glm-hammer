@@ -16,9 +16,10 @@ Exploration precedes questions; critics precede presentation. The user should ne
 1. **Recon before questions.** Dispatch exploration subagents FIRST. Ask the user only what recon provably cannot answer, and cite recon findings in every question.
 2. **Critic panel is mandatory.** Before the plan is presented to the user, dispatch the three critic agents (`feasibility-critic`, `integration-critic`, `coverage-critic`) in parallel. All must return `APPROVE`. The Stop hook blocks turn completion while approvals are missing.
 3. **Any plan edit invalidates approvals.** The PostToolUse hook resets the approval count when the plan file changes. Re-run the full panel after every revision.
-4. **No verdict without a receipt.** Each critic writes its own verdict file under `.glm-hammer/evidence/critics/round-<N>/<critic-name>.md` and ends its final message with `EVIDENCE_RECORDED: <path>`. The Stop hook verifies the receipts on disk — an approval claimed in state without a matching `VERDICT: APPROVE` receipt blocks the turn.
-5. **No placeholders.** TBD / TODO / "implement later" / criteria requiring interpretation are plan failures.
-6. **Keep `.glm-hammer/state.json` current.** Hooks read it to enforce the gates — see State Protocol below.
+4. **No verdict without a receipt.** Each critic writes its own verdict file under `.glm-hammer/evidence/critics/round-<N>/<critic-name>.md` and ends its final message with `EVIDENCE_RECORDED: <path>`. The Stop hook verifies the receipts on disk — an approval claimed in state without a matching `VERDICT: APPROVE` receipt blocks the turn. Receipts are also checked for substance (`CHECKS:` block + real content) and must be **dispatch-backed**: each critic's dispatch prompt must contain its evidence path — the hooks record every subagent dispatch and reject receipts no critic was pointed at. Writing a receipt yourself therefore does not work.
+5. **The plan file is written via the Write/Edit tools only.** Every tracked write reseals its content hash; editing the plan via Bash (redirection, sed, heredoc) breaks the seal, voids all approvals, and the Stop hook blocks until the plan is re-saved via Write.
+6. **No placeholders.** TBD / TODO / "implement later" / criteria requiring interpretation are plan failures.
+7. **Keep `.glm-hammer/state.json` current.** Hooks read it to enforce the gates — see State Protocol below.
 
 ## State Protocol
 

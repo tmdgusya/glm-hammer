@@ -51,7 +51,7 @@ FINDINGS:
 
 ## Evidence Receipt (mandatory)
 
-Your prompt includes an evidence file path. Before returning, write your FULL report (the `VERDICT:` line first, then findings with the evidence you gathered) to that path via Bash, creating parent directories — this write is the one exception to "do not modify any file". Then end your final message with exactly:
+Your prompt includes an evidence file path. Before returning, write your FULL report (the `CHECKS:` block first, then the `VERDICT:` line, then findings with the evidence you gathered) to that path via Bash, creating parent directories — this write is the one exception to "do not modify any file". Then end your final message with exactly:
 
 ```
 EVIDENCE_RECORDED: <path>

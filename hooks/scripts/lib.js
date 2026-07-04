@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 function readStdin() {
   try {
@@ -40,16 +41,119 @@ function writeState(cwd, state) {
   }
 }
 
-// Evidence receipt check: file exists, is non-empty, and (optionally) matches a pattern.
-function evidenceOk(filePath, pattern) {
+// Evidence receipt check with substance requirements: a receipt must exist,
+// carry real content (minBytes), contain its verdict line, and — for judge
+// receipts — contain the binary CHECKS block. A one-line "VERDICT: PASS"
+// file is not evidence of a review having happened.
+function evidenceOk(filePath, opts) {
+  const o = opts instanceof RegExp ? { pattern: opts } : opts || {};
+  const minBytes = o.minBytes == null ? 1 : o.minBytes;
   try {
     const stat = fs.statSync(filePath);
-    if (!stat.isFile() || stat.size <= 0) return false;
-    if (!pattern) return true;
-    return pattern.test(fs.readFileSync(filePath, 'utf8'));
+    if (!stat.isFile() || stat.size < minBytes) return false;
+    if (!o.pattern && !o.requireChecks) return true;
+    const body = fs.readFileSync(filePath, 'utf8');
+    if (o.pattern && !o.pattern.test(body)) return false;
+    if (o.requireChecks && !/CHECKS\s*:/i.test(body)) return false;
+    return true;
   } catch {
     return false;
   }
+}
+
+// ---- Plan content seal (Bash-bypass defense) --------------------------------
+// plan-gate reseals the plan on every tracked Write/Edit. stop-gate compares
+// the file's current hash against the seal: an edit through any untracked
+// route (shell redirection, external tool) breaks the seal and voids approvals.
+function sha256File(filePath) {
+  try {
+    return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+  } catch {
+    return null;
+  }
+}
+
+function planKey(p) {
+  const n = String(p).replace(/\\/g, '/');
+  const m = n.match(/docs\/glm-hammer\/plans\/[^/]+\.md$/i);
+  return (m ? m[0] : n).toLowerCase();
+}
+
+function sealPath(cwd) {
+  return path.join(cwd || process.cwd(), '.glm-hammer', 'plan-seal.json');
+}
+
+function readSeals(cwd) {
+  try {
+    return JSON.parse(fs.readFileSync(sealPath(cwd), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function writeSeal(cwd, filePath) {
+  try {
+    const hash = sha256File(filePath);
+    if (!hash) return;
+    const seals = readSeals(cwd);
+    seals[planKey(filePath)] = { sha256: hash };
+    const p = sealPath(cwd);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    const tmp = `${p}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(seals, null, 2));
+    fs.renameSync(tmp, p);
+  } catch {
+    /* never break the hook */
+  }
+}
+
+function sealMatches(cwd, filePath) {
+  const seal = readSeals(cwd)[planKey(filePath)];
+  if (!seal) return 'missing';
+  const cur = sha256File(filePath);
+  if (!cur) return 'missing';
+  return seal.sha256 === cur ? 'ok' : 'broken';
+}
+
+// ---- Subagent dispatch log (forged-receipt defense) -------------------------
+// dispatch-log.js appends one JSONL entry per Agent/Task tool call, recording
+// every evidence path mentioned in the dispatch input. stop-gate then requires
+// each receipt to be backed by a dispatch that referenced it. Enforcement is
+// fail-open: it activates only once the log has at least one path-bearing
+// entry (i.e., the matcher demonstrably works in this runtime).
+function dispatchLogPath(cwd) {
+  return path.join(cwd || process.cwd(), '.glm-hammer', 'dispatch.jsonl');
+}
+
+function extractEvidenceTails(text) {
+  const tails = [];
+  const re = /\.glm-hammer[\\/]+evidence[\\/]+[^\s"'`,;|)\]}>]+/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const norm = m[0].replace(/\\+/g, '/').replace(/\/+/g, '/');
+    const tail = norm.replace(/^\.glm-hammer\/evidence\//, '').replace(/[.,;:]+$/, '');
+    if (tail) tails.push(tail.toLowerCase());
+  }
+  return tails;
+}
+
+function readDispatchedTails(cwd) {
+  const set = new Set();
+  try {
+    const lines = fs.readFileSync(dispatchLogPath(cwd), 'utf8').split('\n');
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line);
+        (entry.paths || []).forEach((t) => set.add(String(t).toLowerCase()));
+      } catch {
+        /* skip bad line */
+      }
+    }
+  } catch {
+    /* no log yet */
+  }
+  return set;
 }
 
 // When the transcript shows context pressure, blocking a stop makes things
@@ -102,4 +206,11 @@ module.exports = {
   underContextPressure,
   emit,
   emitContext,
+  sha256File,
+  planKey,
+  writeSeal,
+  sealMatches,
+  dispatchLogPath,
+  extractEvidenceTails,
+  readDispatchedTails,
 };
