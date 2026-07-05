@@ -5,16 +5,16 @@
     "url": "https://github.com/tmdgusya"
   },
   "metadata": {
-    "description": "glm-hammer marketplace: strong planning and hammering implementation loops",
-    "version": "0.1.0"
+    "description": "glm-hammer marketplace: storyline-driven design tokens, strong planning, and hammering implementation loops",
+    "version": "0.2.0"
   },
   "plugins": [
     {
       "name": "glm-hammer",
       "source": "./",
-      "description": "Recon-first strong planning (forge) verified by a 3-critic panel, plus a worker-validator-critic implementation loop (hammer) with security/QA review gates. Hooks enforce the gates so the agent cannot skip verification.",
+      "description": "Storyline-driven design tokens verified by a designer panel (crucible), recon-first strong planning (forge) verified by a 3-critic panel, plus a worker-validator-critic implementation loop (hammer) with security/QA review gates. Hooks enforce the gates so the agent cannot skip verification.",
       "category": "engineering",
-      "tags": ["planning", "critic", "worker-validator", "hooks", "review", "loop"]
+      "tags": ["planning", "critic", "worker-validator", "hooks", "review", "loop", "design", "design-tokens"]
     }
   ]
 }
