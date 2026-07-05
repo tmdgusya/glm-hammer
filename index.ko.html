@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>glm-hammer — an engineering harness that proves its work with evidence</title>
-<meta name="description" content="A forge-and-hammer engineering harness for ZCode: 3-critic strong planning, a worker-validator-critic implementation loop, and evidence-gate hooks.">
+<title>glm-hammer — 증거로 검증하는 엔지니어링 하네스</title>
+<meta name="description" content="ZCode용 forge-and-hammer 엔지니어링 하네스: 3-critic 강한 계획, worker-validator-critic 구현 루프, 증거 게이트 훅">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Newsreader:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -112,45 +112,45 @@
   <div class="wrap">
     <div class="logo">🔨</div>
     <h1>glm-<span class="hl">hammer</span></h1>
-    <p class="tag">No need to type prompts — the agent reads the intent itself and runs the whole course on its own:<br>
-    <b>a strong plan → a verified implementation loop → a security &amp; QA review</b>. A ZCode harness.</p>
+    <p class="tag">사람이 프롬프트를 치지 않아도, 에이전트가 의도를 파악해<br>
+    <b>강한 계획 → 검증 루프 구현 → 보안·QA 리뷰</b>를 스스로 완주하는 ZCode 하네스</p>
     <div class="badges">
       <span class="badge">skills <b>3</b></span>
       <span class="badge">critic agents <b>6</b></span>
       <span class="badge">hooks <b>6</b></span>
       <span class="badge">gate <b>evidence-based</b></span>
       <span class="badge"><a href="https://github.com/tmdgusya/glm-hammer">GitHub ↗</a></span>
-      <span class="badge"><a href="index.ko.html" lang="ko">한국어</a></span>
+      <span class="badge"><a href="index.html" lang="en">English</a></span>
     </div>
   </div>
 </header>
 
 <section>
   <div class="wrap">
-    <h2><span class="n">00</span>Philosophy — don't trust; demand the receipt</h2>
+    <h2><span class="n">00</span>철학 — 신뢰하지 말고, 영수증을 요구하라</h2>
     <p class="lead">
-      An LLM agent's "done" is just a claim until it is verified. glm-hammer hands judgment to
-      independent sub-agents, cross-checks that judgment against the <b>evidence files (receipts)
-      left on disk</b>, and if a gate isn't met, <b>hooks block the turn from ending at all</b>.
-      Instead of trusting the agent's diligence, the structure enforces it.
+      LLM 에이전트의 "완료했습니다"는 검증되기 전까지 주장일 뿐입니다. glm-hammer는 판정을
+      독립 서브에이전트에게 맡기고, 그 판정조차 <b>디스크에 남은 증거 파일(영수증)</b>로 대조하며,
+      게이트를 통과하지 못하면 <b>hooks가 턴 종료 자체를 차단</b>합니다.
+      에이전트의 성실성을 믿는 대신, 구조가 성실성을 강제합니다.
     </p>
     <div class="cards">
-      <div class="card"><div class="sub">PRINCIPLE 1</div><h4>Separation of roles</h4>
-        <p>The main agent is only an orchestrator. The maker (worker), the one who judges the contract (validator), the one who hunts for cheating (critic), and the one who attacks the result (reviewer) are all separate sub-agents — none of them can see each other's output.</p></div>
-      <div class="card"><div class="sub">PRINCIPLE 2</div><h4>Evidence gate</h4>
-        <p>Every judge writes its verification report directly to <code>.glm-hammer/evidence/</code> and closes with <code>EVIDENCE_RECORDED</code>. If the state file's claim and the receipt disagree, the hook blocks the turn from ending.</p></div>
+      <div class="card"><div class="sub">PRINCIPLE 1</div><h4>역할 분리</h4>
+        <p>메인 에이전트는 오케스트레이터일 뿐. 만드는 자(worker), 계약을 판정하는 자(validator), 사기를 사냥하는 자(critic), 결과를 공격하는 자(reviewer)는 전부 별도 서브에이전트이며 서로의 산출물을 보지 못합니다.</p></div>
+      <div class="card"><div class="sub">PRINCIPLE 2</div><h4>증거 게이트</h4>
+        <p>모든 판정자는 검증 리포트를 <code>.glm-hammer/evidence/</code>에 직접 남기고 <code>EVIDENCE_RECORDED</code>로 마무리합니다. 상태 파일의 주장과 영수증이 어긋나면 훅이 종료를 막습니다.</p></div>
       <div class="card"><div class="sub">PRINCIPLE 3</div><h4>Binary Judge</h4>
-        <p>Instead of an open-ended summary, the judge answers a fixed yes/no checklist. "If you didn't verify it, you may not say YES." The VERDICT is derived mechanically as the AND of the answers — not a feeling.</p></div>
+        <p>판정자는 총평 대신 고정된 yes/no 체크리스트에 답합니다. "확인 안 했으면 YES 금지." VERDICT는 느낌이 아니라 답들의 AND로 기계적으로 도출됩니다.</p></div>
     </div>
   </div>
 </section>
 
 <section class="flow-sec">
   <div class="wrap">
-    <h2><span class="n">01</span>The full flow</h2>
-    <p class="lead">There are only two places a human steps in — <b>when answering a question</b> and <b>when approving the plan</b>. The loop handles the rest.</p>
+    <h2><span class="n">01</span>전체 흐름</h2>
+    <p class="lead">사용자 개입 지점은 단 두 곳 — <b>질문에 답할 때</b>와 <b>계획을 승인할 때</b>뿐입니다. 나머지는 루프가 알아서 돕니다.</p>
     <div class="flow">
-      <!-- Recolor map (geometry preserved): #6f6558→#7a6b56, #e06c5a→#003153 (apprentice's correction / line.cold), #ff8c42→#d97b30, #ffb347→#c0421d, #e8e0d4→#efe7d6, #2a1a12 stays (surface.ember), #7ec97e stays (status.ok), #12290f→#14100c (surface.sunken), #211d19/#2a2520→#2a211a (surface.raised), #1a1714→#1a1410 (surface.default), #3a332b→#3a2e22 (line.default). All <text> translated to English. -->
+      <!-- Recolor map (geometry preserved): #6f6558→#7a6b56, #e06c5a→#003153 (apprentice's correction / line.cold), #ff8c42→#d97b30, #ffb347→#c0421d, #e8e0d4→#efe7d6, #2a1a12 stays (surface.ember), #7ec97e stays (status.ok), #12290f→#14100c (surface.sunken), #211d19/#2a2520→#2a211a (surface.raised), #1a1714→#1a1410 (surface.default), #3a332b→#3a2e22 (line.default). All <text> in original Korean. -->
       <svg viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Consolas,monospace">
         <defs>
           <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -162,60 +162,60 @@
         </defs>
         <!-- user prompt -->
         <rect x="330" y="14" width="240" height="44" rx="10" fill="#2a211a" stroke="#3a2e22"/>
-        <text x="450" y="41" text-anchor="middle" fill="#efe7d6" font-size="14">💬 "build X properly"</text>
+        <text x="450" y="41" text-anchor="middle" fill="#efe7d6" font-size="14">💬 "X 기능 제대로 만들어줘"</text>
         <!-- router -->
         <rect x="330" y="92" width="240" height="40" rx="20" fill="#2a211a" stroke="#d97b30" stroke-dasharray="4 3"/>
-        <text x="450" y="117" text-anchor="middle" fill="#d97b30" font-size="13">route-intent hook → intent routing</text>
+        <text x="450" y="117" text-anchor="middle" fill="#d97b30" font-size="13">route-intent hook → 의도 라우팅</text>
         <line x1="450" y1="58" x2="450" y2="90" stroke="#7a6b56" stroke-width="1.5" marker-end="url(#ar)"/>
         <!-- forge box -->
         <rect x="60" y="166" width="780" height="130" rx="14" fill="#1a1410" stroke="#3a2e22"/>
-        <text x="84" y="194" fill="#c0421d" font-size="15" font-weight="bold">🔥 FORGE — strong plan</text>
+        <text x="84" y="194" fill="#c0421d" font-size="15" font-weight="bold">🔥 FORGE — 강한 계획</text>
         <rect x="84" y="212" width="150" height="58" rx="8" fill="#2a211a" stroke="#3a2e22"/>
-        <text x="159" y="237" text-anchor="middle" fill="#efe7d6" font-size="12">Deep recon</text>
-        <text x="159" y="255" text-anchor="middle" fill="#7a6b56" font-size="10">Explore ×2–4 parallel</text>
+        <text x="159" y="237" text-anchor="middle" fill="#efe7d6" font-size="12">코드 정찰</text>
+        <text x="159" y="255" text-anchor="middle" fill="#7a6b56" font-size="10">Explore ×2–4 병렬</text>
         <rect x="262" y="212" width="150" height="58" rx="8" fill="#2a211a" stroke="#3a2e22"/>
-        <text x="337" y="237" text-anchor="middle" fill="#efe7d6" font-size="12">Minimal questions</text>
-        <text x="337" y="255" text-anchor="middle" fill="#7a6b56" font-size="10">only what recon couldn't answer</text>
+        <text x="337" y="237" text-anchor="middle" fill="#efe7d6" font-size="12">최소 질문</text>
+        <text x="337" y="255" text-anchor="middle" fill="#7a6b56" font-size="10">정찰이 답 못 한 것만</text>
         <rect x="440" y="212" width="150" height="58" rx="8" fill="#2a211a" stroke="#3a2e22"/>
-        <text x="515" y="237" text-anchor="middle" fill="#efe7d6" font-size="12">Plan draft</text>
-        <text x="515" y="255" text-anchor="middle" fill="#7a6b56" font-size="10">binary criteria + verification</text>
+        <text x="515" y="237" text-anchor="middle" fill="#efe7d6" font-size="12">계획 초안</text>
+        <text x="515" y="255" text-anchor="middle" fill="#7a6b56" font-size="10">binary 기준 + 검증전략</text>
         <rect x="618" y="212" width="196" height="58" rx="8" fill="#2a1a12" stroke="#d97b30"/>
-        <text x="716" y="237" text-anchor="middle" fill="#c0421d" font-size="12">⚖ critic panel ×3</text>
-        <text x="716" y="255" text-anchor="middle" fill="#7a6b56" font-size="10">unanimous APPROVE required</text>
+        <text x="716" y="237" text-anchor="middle" fill="#c0421d" font-size="12">⚖ critic 패널 ×3</text>
+        <text x="716" y="255" text-anchor="middle" fill="#7a6b56" font-size="10">전원 APPROVE 필수</text>
         <line x1="234" y1="241" x2="260" y2="241" stroke="#7a6b56" stroke-width="1.5" marker-end="url(#ar)"/>
         <line x1="412" y1="241" x2="438" y2="241" stroke="#7a6b56" stroke-width="1.5" marker-end="url(#ar)"/>
         <line x1="590" y1="241" x2="616" y2="241" stroke="#7a6b56" stroke-width="1.5" marker-end="url(#ar)"/>
         <!-- reject loop -->
         <path d="M716 270 L716 284 L515 284 L515 272" fill="none" stroke="#003153" stroke-width="1.5" marker-end="url(#arR)"/>
-        <text x="612" y="281" text-anchor="middle" fill="#003153" font-size="10">REJECT → revise, full panel re-review</text>
+        <text x="612" y="281" text-anchor="middle" fill="#003153" font-size="10">REJECT → 수정 후 전체 패널 재심사</text>
         <line x1="450" y1="132" x2="450" y2="164" stroke="#7a6b56" stroke-width="1.5" marker-end="url(#ar)"/>
         <!-- approval -->
         <rect x="330" y="326" width="240" height="42" rx="10" fill="#2a211a" stroke="#7ec97e"/>
-        <text x="450" y="352" text-anchor="middle" fill="#7ec97e" font-size="13">👤 user approves plan (sole gate)</text>
+        <text x="450" y="352" text-anchor="middle" fill="#7ec97e" font-size="13">👤 사용자 계획 승인 (유일한 게이트)</text>
         <line x1="450" y1="296" x2="450" y2="324" stroke="#7a6b56" stroke-width="1.5" marker-end="url(#ar)"/>
         <!-- hammer box -->
         <rect x="60" y="398" width="780" height="128" rx="14" fill="#1a1410" stroke="#3a2e22"/>
-        <text x="84" y="426" fill="#c0421d" font-size="15" font-weight="bold">🔨 HAMMER — implementation loop</text>
+        <text x="84" y="426" fill="#c0421d" font-size="15" font-weight="bold">🔨 HAMMER — 구현 루프</text>
         <rect x="84" y="444" width="240" height="58" rx="8" fill="#2a211a" stroke="#3a2e22"/>
-        <text x="204" y="467" text-anchor="middle" fill="#efe7d6" font-size="12">per task: worker → validator</text>
-        <text x="204" y="486" text-anchor="middle" fill="#7a6b56" font-size="10">→ implementation-critic (3-way check)</text>
+        <text x="204" y="467" text-anchor="middle" fill="#efe7d6" font-size="12">태스크별: worker → validator</text>
+        <text x="204" y="486" text-anchor="middle" fill="#7a6b56" font-size="10">→ implementation-critic (3중 검증)</text>
         <rect x="352" y="444" width="150" height="58" rx="8" fill="#2a211a" stroke="#3a2e22"/>
-        <text x="427" y="467" text-anchor="middle" fill="#efe7d6" font-size="12">E2E GATE</text>
-        <text x="427" y="486" text-anchor="middle" fill="#7a6b56" font-size="10">verify cmd + full suite</text>
+        <text x="427" y="467" text-anchor="middle" fill="#efe7d6" font-size="12">E2E 게이트</text>
+        <text x="427" y="486" text-anchor="middle" fill="#7a6b56" font-size="10">검증 명령 + 전체 테스트</text>
         <rect x="530" y="444" width="170" height="58" rx="8" fill="#2a1a12" stroke="#d97b30"/>
-        <text x="615" y="467" text-anchor="middle" fill="#c0421d" font-size="12">🛡 security + QA review</text>
-        <text x="615" y="486" text-anchor="middle" fill="#7a6b56" font-size="10">parallel, both PASS</text>
+        <text x="615" y="467" text-anchor="middle" fill="#c0421d" font-size="12">🛡 security + QA 리뷰</text>
+        <text x="615" y="486" text-anchor="middle" fill="#7a6b56" font-size="10">병렬, 둘 다 PASS 필수</text>
         <rect x="728" y="444" width="86" height="58" rx="8" fill="#14100c" stroke="#7ec97e"/>
-        <text x="771" y="478" text-anchor="middle" fill="#7ec97e" font-size="13">✓ complete</text>
+        <text x="771" y="478" text-anchor="middle" fill="#7ec97e" font-size="13">✓ 완료</text>
         <line x1="324" y1="473" x2="350" y2="473" stroke="#7a6b56" stroke-width="1.5" marker-end="url(#ar)"/>
         <line x1="502" y1="473" x2="528" y2="473" stroke="#7a6b56" stroke-width="1.5" marker-end="url(#ar)"/>
         <line x1="700" y1="473" x2="726" y2="473" stroke="#7a6b56" stroke-width="1.5" marker-end="url(#ar)"/>
         <path d="M615 502 L615 516 L204 516 L204 504" fill="none" stroke="#003153" stroke-width="1.5" marker-end="url(#arR)"/>
-        <text x="410" y="513" text-anchor="middle" fill="#003153" font-size="10">FAIL → fix task, loop re-entry (stop-gate blocks exit)</text>
+        <text x="410" y="513" text-anchor="middle" fill="#003153" font-size="10">FAIL → fix task로 변환, 루프 재진입 (stop-gate가 이탈 차단)</text>
         <line x1="450" y1="368" x2="450" y2="396" stroke="#7a6b56" stroke-width="1.5" marker-end="url(#ar)"/>
         <!-- side note -->
-        <text x="852" y="245" fill="#7a6b56" font-size="10" transform="rotate(90 852 245)">stop-gate: blocks exit until 3/3 approvals</text>
-        <text x="852" y="470" fill="#7a6b56" font-size="10" transform="rotate(90 852 470)">stop-gate: blocks exit until complete</text>
+        <text x="852" y="245" fill="#7a6b56" font-size="10" transform="rotate(90 852 245)">stop-gate: 3/3 승인 전 종료 차단</text>
+        <text x="852" y="470" fill="#7a6b56" font-size="10" transform="rotate(90 852 470)">stop-gate: 미완료 시 종료 차단</text>
       </svg>
     </div>
   </div>
@@ -223,20 +223,20 @@
 
 <section>
   <div class="wrap">
-    <h2><span class="n">02</span>The three skills</h2>
-    <p class="lead">Since the route-intent hook reads your prompt and routes on its own, you never need to memorize skill names. The rule: ambiguous or touching 4+ files → forge; small and clear → blueprint; plan already in hand → hammer.</p>
+    <h2><span class="n">02</span>스킬 3종</h2>
+    <p class="lead">route-intent 훅이 프롬프트를 보고 알아서 라우팅하므로 스킬 이름을 외울 필요가 없습니다. 기준: 모호하거나 4개 파일 이상이면 forge, 작고 명확하면 blueprint, 계획이 이미 있으면 hammer.</p>
     <div class="cards">
       <div class="card">
-        <div class="sub">skills/blueprint</div><h4>📐 blueprint — the plan</h4>
-        <p>A lightweight plan for small, clear jobs (≤3 files). Same format as forge (binary acceptance criteria, verification strategy, symbol anchors) but a strict Self-Review replaces the critic panel. If it discovers hidden complexity, it promotes itself to forge.</p>
+        <div class="sub">skills/blueprint</div><h4>📐 blueprint — 계획</h4>
+        <p>작고 명확한 작업(≤3 파일)용 경량 계획. forge와 같은 포맷(binary 수용 기준, 검증 전략, 심볼 앵커)이지만 critic 패널 대신 엄격한 Self-Review로 대체. 숨은 복잡도 발견 시 스스로 forge로 승격.</p>
       </div>
       <div class="card">
-        <div class="sub">skills/forge</div><h4>🔥 forge — the strong plan</h4>
-        <p>Before asking a single question, it dispatches 2–4 Explore sub-agents to recon the codebase. Anything recon can answer is never asked. After the draft, three critics verify against the real codebase — a revision loop until all approve.</p>
+        <div class="sub">skills/forge</div><h4>🔥 forge — 강한 계획</h4>
+        <p>질문하기 <b>전에</b> Explore 서브에이전트 2~4개로 코드베이스를 정찰. 정찰이 답할 수 있는 건 절대 묻지 않음. 초안 작성 후 critic 3명이 실제 코드베이스를 대조 검증 — 전원 승인까지 수정 루프.</p>
       </div>
       <div class="card">
-        <div class="sub">skills/hammer</div><h4>🔨 hammer — the implementation loop</h4>
-        <p>Per task, a three-way check: worker → validator (information isolation) → implementation-critic (cheat detection). Once everything is done: the E2E gate → a parallel security/QA review. A FAIL becomes a fix task and loops back.</p>
+        <div class="sub">skills/hammer</div><h4>🔨 hammer — 구현 루프</h4>
+        <p>태스크마다 worker → validator(정보 격리) → implementation-critic(사기 탐지) 3중 검증. 전체 완료 후 E2E 게이트 → security/QA 병렬 리뷰. FAIL은 fix task가 되어 루프로 되돌아감.</p>
       </div>
     </div>
   </div>
@@ -244,90 +244,90 @@
 
 <section>
   <div class="wrap">
-    <h2><span class="n">03</span>FORGE in detail — setting the plan on the anvil</h2>
+    <h2><span class="n">03</span>FORGE 상세 — 계획을 모루 위에 올린다</h2>
     <div class="steps">
-      <div class="step"><h4>Deep recon <span class="st">state: recon</span></h4>
-        <p>It splits the work into four concerns — structure / existing patterns / interface boundaries / verification infrastructure — and dispatches parallel Explore sub-agents. Before asking the user anything, it exhausts everything the code itself can answer.</p></div>
-      <div class="step"><h4>Minimal question round <span class="st">state: awaiting-user</span></h4>
-        <p>Only the ambiguity recon couldn't resolve, cited against recon results, bundled into at most four independent questions in a single round. If no answers are needed, it asks nothing and moves on.</p></div>
-      <div class="step"><h4>Actionable plan draft <span class="st">state: drafting</span></h4>
-        <p>Saved to <code>docs/glm-hammer/plans/</code>. Every task is a Goal + dependencies + a list of symbol-anchor files + <b>binary acceptance criteria with no room for interpretation</b> + steps that hold real code. A placeholder counts as a plan failure.</p></div>
-      <div class="step"><h4>The Anvil — critic panel <span class="st">state: critique</span></h4>
-        <p>Three critics attack the plan in parallel: <b>feasibility</b> (can it be built as written?), <b>integration</b> (will it assemble and run?), <b>coverage</b> (does it cover every requirement?). Each leaves a receipt; a single REJECT means a revision → <b>full panel re-review</b>. The instant the plan file is edited, the plan-gate hook resets approvals to zero, so re-review is enforced, not optional. Past 3 rounds, it escalates to the user.</p></div>
-      <div class="step"><h4>Present &amp; hand off <span class="st">state: awaiting-user → approved</span></h4>
-        <p>It presents the plan with a summary and asks exactly one thing: "Shall we proceed with hammer?" — on approval, hammer picks it up immediately.</p></div>
+      <div class="step"><h4>깊은 정찰 <span class="st">state: recon</span></h4>
+        <p>구조 / 기존 패턴 / 인터페이스 경계 / 검증 인프라, 네 가지 관심사로 쪼개 Explore 서브에이전트를 병렬 파견. 사용자에게 묻기 전에 코드가 답할 수 있는 모든 것을 소진합니다.</p></div>
+      <div class="step"><h4>최소 질문 라운드 <span class="st">state: awaiting-user</span></h4>
+        <p>정찰로도 남은 모호함만, 정찰 결과를 인용해서, 독립 질문 최대 4개를 한 라운드에 묶어 질문. 답이 필요 없으면 묻지 않고 통과합니다.</p></div>
+      <div class="step"><h4>실행 가능한 계획 초안 <span class="st">state: drafting</span></h4>
+        <p><code>docs/glm-hammer/plans/</code>에 저장. 모든 태스크는 Goal + 의존성 + 심볼 앵커 파일 목록 + <b>해석 여지 없는 binary 수용 기준</b> + 실제 코드가 담긴 스텝으로 구성. placeholder는 계획 실패로 간주.</p></div>
+      <div class="step"><h4>모루(Anvil) — critic 패널 <span class="st">state: critique</span></h4>
+        <p><b>feasibility</b>(이대로 구현 가능한가) / <b>integration</b>(조립하면 돌아가는가) / <b>coverage</b>(요구를 다 덮는가) 세 critic이 병렬로 계획을 공격. 각자 영수증을 남기고, 하나라도 REJECT면 수정 → <b>전체 패널 재심사</b>. 계획 파일을 고치는 순간 plan-gate 훅이 승인을 0으로 리셋하므로 재심사는 선택이 아니라 강제입니다. 3라운드 초과 시 사용자 에스컬레이션.</p></div>
+      <div class="step"><h4>제시 &amp; 핸드오프 <span class="st">state: awaiting-user → approved</span></h4>
+        <p>요약과 함께 계획을 제시하고 단 하나만 묻습니다: "hammer로 진행할까요?" — 승인하면 hammer가 즉시 이어받습니다.</p></div>
     </div>
   </div>
 </section>
 
 <section>
   <div class="wrap">
-    <h2><span class="n">04</span>HAMMER in detail — striking until it passes</h2>
+    <h2><span class="n">04</span>HAMMER 상세 — 통과할 때까지 두드린다</h2>
     <div class="steps">
-      <div class="step"><h4>Task cycle: worker → validator → critic</h4>
-        <p>The <b>worker</b> implements per the plan (a step that clashes with reality is minimally adapted, then reported). The <b>validator</b>, having never seen the worker's output, judges each acceptance criterion from the plan text alone as an isolated yes/no. On pass, the <b>implementation-critic</b> hunts what the validator couldn't see — stubs, test-shaped hardcoding, swallowed errors, tests that verify nothing.</p></div>
-      <div class="step"><h4>Failure triage — best-of-three</h4>
-        <p>A failure is triaged first: a <b>worker defect</b> means a rework carrying all accumulated feedback; a <b>plan defect</b> means editing the plan file itself (an Amendment Log is recorded; loosening a criterion is forbidden as reward hacking). After three failures on one task, it escalates to the user.</p></div>
-      <div class="step"><h4>E2E gate</h4>
-        <p>Once all tasks are done, it runs the plan's verification-strategy command plus the full test suite. The raw output is saved to <code>evidence/e2e.md</code> — without this receipt, the stop-gate will not let it pass.</p></div>
-      <div class="step"><h4>Review panel: security + QA</h4>
-        <p>Two reviewers attack the changed code in parallel — security goes after injection / auth / secret keys / exposure, QA goes after real behavior / edge cases / regressions / test adequacy, each on its own binary checklist. <b>A blocking finding becomes a fix task</b> that must re-run the entire task cycle, and after the fix both the E2E gate and the review panel are re-run <b>in full</b>.</p></div>
+      <div class="step"><h4>태스크 사이클: worker → validator → critic</h4>
+        <p><b>worker</b>가 계획대로 구현(현실과 어긋난 스텝은 최소 적응 후 보고). <b>validator</b>는 worker의 산출물을 전혀 보지 못한 채, 계획 원문만으로 각 수용 기준을 고립된 yes/no 질문으로 판정. 통과하면 <b>implementation-critic</b>이 validator가 못 보는 것 — 스텁, 테스트 맞춤 하드코딩, 삼켜진 에러, 아무것도 검증 안 하는 테스트 — 를 사냥합니다.</p></div>
+      <div class="step"><h4>실패 triage — 3진 아웃</h4>
+        <p>실패는 먼저 분류: <b>worker 결함</b>이면 누적된 피드백 전부를 들고 재작업, <b>계획 결함</b>이면 계획 파일 자체를 수정(Amendment Log 기록, 기준 완화는 리워드 해킹으로 금지). 한 태스크 3회 실패 시 사용자 에스컬레이션.</p></div>
+      <div class="step"><h4>E2E 게이트</h4>
+        <p>모든 태스크 완료 후 계획의 검증 전략 명령 + 전체 테스트 스위트 실행. 원본 출력을 <code>evidence/e2e.md</code>에 저장 — 이 영수증이 없으면 stop-gate가 통과시키지 않습니다.</p></div>
+      <div class="step"><h4>리뷰 패널: security + QA</h4>
+        <p>두 리뷰어가 병렬로 변경 코드를 공격 — security는 인젝션/인증/비밀키/노출을, QA는 실제 동작/엣지 케이스/회귀/테스트 적정성을 각자 binary 체크리스트로 판정. <b>blocking finding은 fix task로 변환</b>되어 전체 태스크 사이클을 다시 통과해야 하고, 수정 후에는 E2E와 리뷰 패널 <b>전체</b>를 재실행합니다.</p></div>
     </div>
-    <div class="callout"><b>Why isn't the worker's output shown to the validator?</b> — To stop the judge from anchoring onto the maker's own framing. The validator prompt uses only a fixed template that copies the plan text verbatim; the main agent's summaries and paraphrases are forbidden.</div>
+    <div class="callout"><b>왜 validator에게 worker 출력을 안 보여주나?</b> — 판정자가 만든 자의 프레이밍에 앵커링되는 것을 막기 위해서입니다. validator 프롬프트는 계획 원문을 그대로 복사한 고정 템플릿만 사용하며, 메인 에이전트의 요약·의역은 금지됩니다.</div>
   </div>
 </section>
 
 <section>
   <div class="wrap">
-    <h2><span class="n">05</span>Hooks — the devices that enforce the gates physically</h2>
-    <p class="lead">Once a skill writes state to <code>.glm-hammer/state.json</code>, a hook cross-checks that state against the evidence on disk and enforces the gate. Verified configuration against the ZCode-installed engine.</p>
+    <h2><span class="n">05</span>Hooks — 게이트를 물리적으로 강제하는 장치</h2>
+    <p class="lead">스킬이 <code>.glm-hammer/state.json</code>에 상태를 기록하면, 훅이 그 상태와 디스크의 증거를 대조해 게이트를 강제합니다. ZCode 설치본 엔진 기준으로 검증된 구성입니다.</p>
     <div class="tbl"><table>
-      <tr><th>Hook</th><th>Event</th><th>Role</th></tr>
-      <tr><td><code>session-start</code></td><td>SessionStart</td><td>On finding an unfinished run, injects a resume briefing — automatic return after a restart or compaction, with no "continue" needed.</td></tr>
-      <tr><td><code>route-intent</code></td><td>UserPromptSubmit</td><td>If it's a work request, injects a forge/blueprint/hammer routing directive; if work is in progress, reminds of the current state.</td></tr>
-      <tr><td><code>plan-gate</code></td><td>PostToolUse</td><td>During forge, detects a plan-file edit → resets critic approvals to zero, forcing a full panel re-review.</td></tr>
-      <tr><td><code>comment-checker</code></td><td>PostToolUse</td><td>Detects AI-slop comments: elision markers ("... existing code ..."), change narration, placeholders — orders an immediate fix in the same turn.</td></tr>
-      <tr><td><code>edit-diagnostics</code></td><td>PostToolUse</td><td>LSP-lite: an instant syntax check on edited files (JS/JSON/Python) — catches a broken file right at the edit, not at the E2E gate.</td></tr>
-      <tr><td><code>stop-gate</code></td><td>Stop</td><td>Cross-checks the state's claims against the evidence receipts — if a gate isn't met, it blocks the turn from ending, and hardens its directive tone with each repeat.</td></tr>
+      <tr><th>Hook</th><th>이벤트</th><th>역할</th></tr>
+      <tr><td><code>session-start</code></td><td>SessionStart</td><td>미완료 런 발견 시 재개 브리핑 주입 — 재시작·컴팩션 후에도 "continue" 없이 자동 복귀</td></tr>
+      <tr><td><code>route-intent</code></td><td>UserPromptSubmit</td><td>작업 요청이면 forge/blueprint/hammer 라우팅 지침 주입, 진행 중이면 현재 상태 리마인드</td></tr>
+      <tr><td><code>plan-gate</code></td><td>PostToolUse</td><td>forge 중 계획 파일 수정 감지 → critic 승인 0으로 리셋, 전체 패널 재심사 강제</td></tr>
+      <tr><td><code>comment-checker</code></td><td>PostToolUse</td><td>AI 슬롭 주석 탐지: elision 마커("... existing code ..."), 변경 나레이션, placeholder — 같은 턴에서 즉시 수정 지시</td></tr>
+      <tr><td><code>edit-diagnostics</code></td><td>PostToolUse</td><td>LSP-lite: 수정 파일 즉시 구문 검사(JS/JSON/Python) — 깨진 파일을 E2E가 아닌 수정 직후에 적발</td></tr>
+      <tr><td><code>stop-gate</code></td><td>Stop</td><td>state의 주장과 증거 영수증 대조 — 게이트 미충족 시 턴 종료 차단, 반복될수록 directive 톤 강화</td></tr>
     </table></div>
 
-    <h3>Evidence gates</h3>
-    <p class="lead" style="margin-bottom:14px">A completion claim in state.json is not trusted. A receipt left on disk by the judge itself is what opens the gate.</p>
+    <h3>증거 게이트 (Evidence Gates)</h3>
+    <p class="lead" style="margin-bottom:14px">state.json의 완료 주장은 신뢰되지 않습니다. 판정자 본인이 남긴 영수증이 디스크에 있어야만 게이트가 열립니다.</p>
     <pre><code>.glm-hammer/evidence/
-├── critics/round-&lt;N&gt;/&lt;critic&gt;.md   # VERDICT: APPROVE ×3 required
+├── critics/round-&lt;N&gt;/&lt;critic&gt;.md   # VERDICT: APPROVE ×3 필요
 ├── tasks/task-&lt;i&gt;/validator.md     # VERDICT: PASS
 ├── tasks/task-&lt;i&gt;/critic.md        # VERDICT: APPROVE
-├── e2e.md                          # E2E gate raw output
+├── e2e.md                          # E2E 게이트 원본 출력
 └── reviews/{security,qa}.md        # VERDICT: PASS</code></pre>
-    <div class="quote">"It claims approval but there's no receipt → that approval never happened. A completion claim without a receipt is blocked."</div>
-    <p style="font-size:var(--fs-small);color:var(--text-muted)">Escape hatches are designed in too: a legitimate user escalation (<code>awaiting-user</code>), a concession after 6 blocks, and an unblock when context pressure is detected. The evidence-gate and session-recovery patterns are borrowed from <a href="https://github.com/code-yeongyu/lazycodex">lazycodex (OmO)</a>.</p>
+    <div class="quote">"승인을 주장하지만 영수증이 없다 → 그 승인은 일어나지 않은 것이다. 영수증 없는 완료 주장은 차단된다."</div>
+    <p style="font-size:var(--fs-small);color:var(--text-muted)">탈출구도 설계되어 있습니다: 정당한 사용자 에스컬레이션(<code>awaiting-user</code>), 차단 6회 시 양보, 컨텍스트 압박 감지 시 차단 해제. 증거 게이트·세션 복구 패턴은 <a href="https://github.com/code-yeongyu/lazycodex">lazycodex(OmO)</a>에서 가져왔습니다.</p>
   </div>
 </section>
 
 <section class="verdict">
   <div class="wrap">
-    <h2><span class="n">06</span>Binary Judge — no summaries, only yes/no</h2>
-    <p class="lead">Reflecting the observation that an LLM judge is more reliable on binary questions than on open summaries, all six judges rule on fixed checklists.</p>
+    <h2><span class="n">06</span>Binary Judge — 총평 금지, 예/아니오만</h2>
+    <p class="lead">LLM judge는 열린 총평보다 binary 질문에서 더 신뢰할 수 있다는 관찰을 반영해, 6개 판정자 전원이 고정 체크리스트로 판정합니다.</p>
     <div class="two">
       <div class="card">
-        <div class="sub">example: implementation-critic</div>
+        <div class="sub">예: implementation-critic</div>
         <pre style="margin-top:var(--sp-xs)"><code>CHECKS:
-- C1: YES — real implementation exists in every function
-- C2: NO  — parse() has a branch tuned to the test
-         input only (utils.js:42)
-- C3: YES — every new test can fail
+- C1: YES — 모든 함수에 실제 구현 존재
+- C2: NO  — parse()가 테스트 입력값에만
+         특화된 분기 발견 (utils.js:42)
+- C3: YES — 새 테스트 모두 실패 가능
 - C4: YES / C5: YES / C6: YES
-VERDICT: REJECT   ← automatic if any NO
+VERDICT: REJECT   ← NO가 하나라도 있으면 자동
 FINDINGS:
 - [REJECT-level] criteria-shaped
   hardcoding at utils.js:parse ...</code></pre>
       </div>
       <div class="card">
-        <div class="sub">the rules</div>
-        <p style="margin-bottom:var(--sp-sm)">Answer each question only <b>YES / NO / N-A</b>, and attach a one-line basis (what you verified).</p>
-        <p style="margin-bottom:var(--sp-sm)"><span class="pill ok">YES</span> Only when verified directly with a tool. <b>If you didn't verify it, you may not answer YES — verify it, or answer NO.</b></p>
-        <p style="margin-bottom:var(--sp-sm)"><span class="pill no">NO</span> Must come with a matching finding (file · symbol · evidence).</p>
-        <p>VERDICT = the AND of all answers. No partial credit, no "almost there," no conditional pass. The verdict is computed, not felt.</p>
+        <div class="sub">규칙</div>
+        <p style="margin-bottom:var(--sp-sm)">각 질문에 <b>YES / NO / N-A</b>로만 답하고, 한 줄 근거(무엇을 확인했는지)를 붙입니다.</p>
+        <p style="margin-bottom:var(--sp-sm)"><span class="pill ok">YES</span> 직접 도구로 확인한 경우에만. <b>확인하지 않았으면 YES라고 답할 수 없다 — 확인하거나 NO.</b></p>
+        <p style="margin-bottom:var(--sp-sm)"><span class="pill no">NO</span> 반드시 대응하는 finding(파일·심볼·증거)과 함께.</p>
+        <p>VERDICT = 모든 답의 AND. 부분 점수·"거의 됨"·조건부 통과 없음. 판정은 계산되는 것이지 느끼는 것이 아닙니다.</p>
       </div>
     </div>
   </div>
@@ -335,20 +335,19 @@ FINDINGS:
 
 <section>
   <div class="wrap">
-    <h2><span class="n">07</span>Install</h2>
-    <p class="lead">Requirement: Node.js 18+ (to run the hook scripts; must be on your PATH).</p>
+    <h2><span class="n">07</span>설치</h2>
+    <p class="lead">요구사항: Node.js 18+ (훅 스크립트 실행용, PATH에 있어야 함)</p>
     <h3>ZCode</h3>
     <p style="font-size:var(--fs-small);color:var(--text-muted);margin-bottom:var(--sp-sm)">
-      <b>Settings → Plugin Management</b> → add a custom marketplace → register the GitHub repo
-      <code>tmdgusya/glm-hammer</code> (or your local clone path if you're developing) as a source → install glm-hammer.
-      After install, check the plugin detail to confirm all 6 hooks show as runnable.</p>
+      <b>Settings → Plugin Management</b> → 커스텀 마켓플레이스 추가 → 소스로 GitHub 저장소
+      <code>tmdgusya/glm-hammer</code> (또는 개발 중이면 로컬 클론 경로) 등록 → glm-hammer 설치.
+      설치 후 플러그인 상세에서 hooks 6개가 runnable로 뜨는지 확인하세요.</p>
     <h3>Claude Code</h3>
     <pre><code>claude plugin marketplace add tmdgusya/glm-hammer
 claude plugin install glm-hammer@glm-hammer</code></pre>
     <p style="font-size:var(--fs-small);color:var(--text-muted);margin-top:var(--sp-md)">
-      After install, just talk to it the way you normally would — a single line like
-      <i>"build the checkout module properly"</i> is enough for the router to fire forge, and
-      after one plan approval you won't need to touch anything until the completion report.</p>
+      설치 후에는 그냥 평소처럼 말하면 됩니다 — <i>"결제 모듈 제대로 만들어줘"</i> 한 줄이면
+      라우터가 forge를 태우고, 계획 승인 한 번 뒤에는 완료 보고까지 손댈 일이 없습니다.</p>
   </div>
 </section>
 
