@@ -32,6 +32,15 @@ try {
     if (state.critics && state.critics.required) {
       bits.push(`critics ${state.critics.approved || 0}/${state.critics.required} (round ${state.critics.round || 1})`);
     }
+    if (state.prospect && state.prospect.required) {
+      bits.push(`prospect ${state.prospect.reported || 0}/${state.prospect.required}`);
+    }
+    if (state.assay) {
+      bits.push(`assay ${state.assay.verdict || 'pending'} (round ${state.assay.round || 1})`);
+    }
+    if (state.panel && state.panel.required) {
+      bits.push(`panel ${state.panel.approved || 0}/${state.panel.required} (round ${state.panel.round || 1})`);
+    }
     if (state.reviews) {
       bits.push(`reviews security=${state.reviews.security || 'pending'} qa=${state.reviews.qa || 'pending'}`);
     }
@@ -45,11 +54,13 @@ try {
   }
 
   const workRequest =
-    /(만들|추가|구현|개발|리팩터|리팩토링|수정|고쳐|바꿔|기능|시스템|설계|계획|플랜|만들어|붙여|개선|마이그레이션|build|implement|add|create|refactor|feature|fix|migrate|redesign|develop|integrate|rewrite|plan)/i;
+    /(만들|추가|구현|개발|리팩터|리팩토링|수정|고쳐|바꿔|기능|시스템|설계|디자인|계획|플랜|만들어|붙여|개선|마이그레이션|build|implement|add|create|refactor|feature|fix|migrate|redesign|design|develop|integrate|rewrite|plan)/i;
   if (!workRequest.test(prompt)) process.exit(0);
 
   const executeIntent =
     /(플랜.*(실행|구현|시작)|계획.*(실행|구현|시작)|(실행|구현|시작).*(플랜|계획)|execute the plan|run the plan|implement the plan|proceed with the plan|start implementing)/i;
+  const designIntent =
+    /(디자인|무드|룩\s*앤\s*필|브랜딩|비주얼|스타일\s*가이드|디자인\s*토큰|리디자인|design\s*tokens?|style\s*guide|visual\s*identity|look\s*and\s*feel|branding|mood)/i;
   const strongMarker =
     /(강한|강력|빡세|제대로|철저|꼼꼼|탄탄|deep|thorough|robust|strong|rigorous|properly|carefully)/i;
 
@@ -65,11 +76,16 @@ try {
   let hint;
   if (executeIntent.test(prompt) && plansDirHasFiles) {
     hint = 'This looks like a request to execute an existing plan → invoke the `hammer` skill.';
+  } else if (designIntent.test(prompt)) {
+    hint =
+      'This looks like a storyline/reference-driven design request → invoke the `crucible` skill ' +
+      '(reference prospecting → design tokens → fidelity assay → designer panel) before any planning or implementation.';
   } else if (strongMarker.test(prompt)) {
     hint = 'The user is asking for rigorous work → invoke the `forge` skill (strong planning) before touching code.';
   } else {
     hint =
       'Route before touching code: ambiguous scope, 4+ files, or new/changed interfaces → `forge` skill; ' +
+      'storyline/mood/design-token work → `crucible` skill; ' +
       'small clear change (≤3 files, existing interfaces) → `blueprint` skill; ' +
       'an approved plan already exists and the user wants it built → `hammer` skill. ' +
       'Trivial one-liners need no skill.';

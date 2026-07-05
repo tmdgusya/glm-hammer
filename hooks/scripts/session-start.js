@@ -31,6 +31,15 @@ try {
   if (state.reviews) {
     lines.push(`reviews: security=${state.reviews.security || 'pending'}, qa=${state.reviews.qa || 'pending'}`);
   }
+  if (state.prospect && state.prospect.required) {
+    lines.push(`prospect: ${state.prospect.reported || 0}/${state.prospect.required} reports`);
+  }
+  if (state.assay) {
+    lines.push(`assay: ${state.assay.verdict || 'pending'} (round ${state.assay.round || 1})`);
+  }
+  if (state.panel && state.panel.required) {
+    lines.push(`panel: ${state.panel.approved || 0}/${state.panel.required} APPROVE (round ${state.panel.round || 1})`);
+  }
   if (state.status === 'awaiting-user') {
     lines.push(
       'The run is paused waiting on the user. Do not resume the loop on your own — restate the open question to the user first.'
