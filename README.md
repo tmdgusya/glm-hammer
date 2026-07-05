@@ -1,5 +1,7 @@
 # 🔨 glm-hammer
 
+**📖 워크플로우 설명 페이지 → [tmdgusya.github.io/glm-hammer](https://tmdgusya.github.io/glm-hammer/)**
+
 ZCode / Claude Code 호환 엔지니어링 하네스 플러그인.
 사람이 스킬 이름을 외우거나 프롬프트를 길게 치지 않아도, 에이전트가 의도를 파악해
 **강한 계획 → 검증 루프 구현 → 보안/QA 리뷰**를 스스로 돌게 만듭니다.
