@@ -53,8 +53,35 @@ hooks는 서브에이전트를 직접 띄울 수 없으므로, 스킬이 `.glm-h
 | `plan-gate.js` | PostToolUse (Write\|Edit) | 계획 파일 저장 시 **콘텐츠 실(seal, sha256) 기록**. forge 중 수정이면 critic 승인 0 리셋 → 전체 패널 재심사 강제. hammer 중이면 Amendment Log 기록 요구 |
 | `dispatch-log.js` | PostToolUse (Agent\|Task) | 서브에이전트 디스패치 원장 — 디스패치 입력에 언급된 evidence 경로를 기록. stop-gate가 영수증의 디스패치 근거를 대조 |
 | `comment-checker.js` | PostToolUse (Write\|Edit) | 방금 수정한 파일에서 AI 슬롭 주석 탐지: **elision 마커**("... existing code ..." — 파일 손상 신호), 변경 나레이션 주석("// added X"), placeholder 주석. 발견 즉시 같은 턴에서 수정 지시 |
-| `edit-diagnostics.js` | PostToolUse (Write\|Edit) | LSP-lite: 수정 파일에 빠른 구문 검사(JS `node --check`, JSON parse, Python `py_compile`) — 깨진 파일을 E2E 게이트가 아니라 **수정 직후** 잡아냄 |
+| `edit-diagnostics.js` | PostToolUse (Write\|Edit) | 프로젝트 도구 진단: 프로젝트에 이미 설치된 검사기(로컬 `node_modules` + PATH 도구)를 발견해 수정 파일에 실행 — 깨진 코드를 E2E 게이트가 아니라 **수정 직후** 잡아냄. 상세는 아래 |
 | `stop-gate.js` | Stop | state의 주장과 **증거 영수증을 대조**해 턴 종료를 차단. `awaiting-user`(정당한 에스컬레이션)만 통과 |
+
+### Edit diagnostics — 프로젝트 도구 발견
+
+`edit-diagnostics.js`는 OmO의 철학을 따릅니다 — *연결과 안내는 플러그인, 도구는 프로젝트가 공급한다*. Write/Edit 직후 프로젝트에 이미 있는 최적의 검사기를 발견해 수정된 파일에 실행합니다. 전부 fail-open: 도구가 없거나, 설정이 없거나, 도구 자체가 죽으면 조용히 스킵하고 — 진짜 발견(findings)만 같은 턴에 피드백으로 주입됩니다.
+
+| 언어 | 발견 대상 |
+|---|---|
+| JS/TS | `node --check`(구문) + 로컬 `node_modules`의 biome / eslint / oxlint; `tsc --noEmit`(옵트인, 프로젝트 전체) |
+| Python | PATH의 `ruff` → 없으면 `py_compile` 폴백; `pyright`(옵트인) |
+| JSON | `JSON.parse` (tsconfig.json 같은 JSONC는 스킵) |
+| Go | 파일이 속한 패키지에 `go vet` (상위에 `go.mod` 필요) |
+| Shell | `bash -n` + `shellcheck` |
+| Ruby / PHP / YAML / CSS | `ruby -c` / `php -l` / `yamllint` / 로컬 `stylelint` |
+
+- Node 도구는 `.bin` 심이 아니라 실제 JS 엔트리(`node_modules/eslint/bin/eslint.js` 등)로 실행 — Windows `.cmd` 심 문제를 원천 회피합니다.
+- exit code를 도구별로 해석: lint 발견(eslint/ruff는 1, stylelint는 2)만 보고하고, 도구·설정 오류는 파일 문제가 아니라 "스킵"으로 처리합니다.
+- OmO와 마찬가지로 **검사기 본체는 번들하지 않습니다** — 프로젝트에 설치된 것만 쓰고, 없으면 침묵합니다.
+
+`.glm-hammer/diagnostics.json`으로 선택 설정:
+
+```json
+{ "typecheck": true, "disable": ["eslint"], "timeoutMs": 15000 }
+```
+
+- `typecheck` — 느린 프로젝트 전체 검사기(`tsc --noEmit`, `pyright`) 활성화. 대형 저장소에서 hammer 루프 속도를 지키기 위해 **기본 OFF**이며, tsc 출력은 수정한 파일 관련 줄로 필터링됩니다.
+- `disable` — 끌 검사기 이름 목록: `node-syntax`, `biome`, `eslint`, `oxlint`, `tsc`, `json`, `ruff`, `py-syntax`, `pyright`, `go-vet`, `bash-syntax`, `shellcheck`, `ruby-syntax`, `php-syntax`, `yamllint`, `stylelint`.
+- `timeoutMs` — 검사당 타임아웃(ms, 기본 10000; 타입체커는 45000).
 
 ### ZCode 호환성 (엔진 실증 기준)
 

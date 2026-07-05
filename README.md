@@ -53,8 +53,35 @@ Hooks cannot spawn subagents directly, so the skill writes state to `.glm-hammer
 | `plan-gate.js` | PostToolUse (Write\|Edit) | On saving a plan file, **record a content seal (seal, sha256)**. If edited during forge, reset critic approvals to 0 → force full panel re-review. If during hammer, require an Amendment Log entry |
 | `dispatch-log.js` | PostToolUse (Agent\|Task) | Subagent dispatch ledger — records the evidence paths named in the dispatch input. stop-gate cross-checks a receipt's dispatch provenance |
 | `comment-checker.js` | PostToolUse (Write\|Edit) | Detect AI-slop comments in the file just edited: **elision markers** ("... existing code ..." — a file-corruption signal), change-narration comments ("// added X"), placeholder comments. On detection, order a fix in the same turn |
-| `edit-diagnostics.js` | PostToolUse (Write\|Edit) | LSP-lite: quick syntax check on the edited file (JS `node --check`, JSON parse, Python `py_compile`) — catches a broken file **right after the edit**, not at the E2E gate |
+| `edit-diagnostics.js` | PostToolUse (Write\|Edit) | Project-tool diagnostics: discovers the checkers the project already has (local `node_modules` bins + PATH tools) and runs them on the edited file — catches broken code **right after the edit**, not at the E2E gate. Details below |
 | `stop-gate.js` | Stop | Cross-checks the state's claims against **evidence receipts** to block turn end. Only `awaiting-user` (a legitimate escalation) passes |
+
+### Edit diagnostics — project-tool discovery
+
+`edit-diagnostics.js` follows the OmO model — *the plugin connects and guides; the project supplies the tools*. After every Write/Edit it discovers the best checkers already present and runs them on the edited file. Everything is fail-open: a tool that is absent, unconfigured, or crashing is silently skipped — only real findings are injected back into the turn.
+
+| Language | Discovered checkers |
+|---|---|
+| JS/TS | `node --check` (syntax) + local `node_modules` biome / eslint / oxlint; `tsc --noEmit` (opt-in, project-wide) |
+| Python | `ruff` on PATH → falls back to `py_compile`; `pyright` (opt-in) |
+| JSON | `JSON.parse` (JSONC files like tsconfig.json are skipped) |
+| Go | `go vet` on the file's package (requires `go.mod` up-tree) |
+| Shell | `bash -n` + `shellcheck` |
+| Ruby / PHP / YAML / CSS | `ruby -c` / `php -l` / `yamllint` / local `stylelint` |
+
+- Node tools are invoked through their real JS entries (`node_modules/eslint/bin/eslint.js`, …), never the `.bin` shims — so Windows `.cmd` shims are never needed.
+- Exit codes are interpreted per tool: lint findings (eslint/ruff exit 1, stylelint exit 2) are reported; tool/config errors count as "skip", never as file problems.
+- Like OmO, **the checkers themselves are not bundled** — the hook uses whatever the project installs, and stays silent otherwise.
+
+Optional config at `.glm-hammer/diagnostics.json`:
+
+```json
+{ "typecheck": true, "disable": ["eslint"], "timeoutMs": 15000 }
+```
+
+- `typecheck` — enables the slow project-wide checkers (`tsc --noEmit`, `pyright`). **Off by default** so the hammer loop stays fast on large repos; tsc output is filtered to the lines mentioning the edited file.
+- `disable` — checker names to turn off: `node-syntax`, `biome`, `eslint`, `oxlint`, `tsc`, `json`, `ruff`, `py-syntax`, `pyright`, `go-vet`, `bash-syntax`, `shellcheck`, `ruby-syntax`, `php-syntax`, `yamllint`, `stylelint`.
+- `timeoutMs` — per-check timeout in milliseconds (default 10000; typecheckers get 45000).
 
 ### ZCode compatibility (per engine verification)
 
