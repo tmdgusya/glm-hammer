@@ -80,6 +80,17 @@ lowContrast.color.text.default.$value = '#8a8a8a';
 const r2 = validateTokens(writeTokens(lowContrast));
 check('low contrast rejected', !r2.ok && r2.problems.some((p) => /contrast/i.test(p)));
 
+// (e2) non-object documents are rejected, not crashed on (QA finding: fail-open via thrown TypeError)
+for (const bad of ['null', '[]', '123', '"str"', 'true']) {
+  let res = null;
+  try {
+    res = validateTokens(writeTokens(JSON.parse(bad)));
+  } catch {
+    res = null;
+  }
+  check(`validateTokens rejects non-object ${bad}`, !!res && res.ok === false && res.problems.some((m) => /object/i.test(m)));
+}
+
 // (f) contrast math
 check('contrast(#000,#fff) === 21', Math.abs(contrast('#000000', '#ffffff') - 21) < 0.01);
 
@@ -145,6 +156,14 @@ function runStopGate() {
 }
 lib.writeState(proj, greenState);
 check('stop-gate silent when crucible gates are green', runStopGate().indexOf('"block"') === -1);
+
+// (h2) non-object tokens.json fails CLOSED at the stop gate
+fs.writeFileSync(path.join(designAbs, 'tokens.json'), 'null');
+lib.writeSeal(proj, path.join(designAbs, 'tokens.json'));
+lib.writeState(proj, greenState);
+check('stop-gate blocks on non-object tokens.json', runStopGate().indexOf('"block"') !== -1);
+fs.writeFileSync(path.join(designAbs, 'tokens.json'), JSON.stringify(GOOD, null, 2));
+lib.writeSeal(proj, path.join(designAbs, 'tokens.json'));
 
 fs.rmSync(evid('design/assay/round-1/fidelity-critic.md'));
 lib.writeState(proj, greenState);

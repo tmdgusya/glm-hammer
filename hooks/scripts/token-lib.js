@@ -96,6 +96,9 @@ function validateTokens(tokensPath) {
   } catch (e) {
     return { ok: false, problems: [`tokens.json missing or invalid JSON: ${e.message}`] };
   }
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
+    return { ok: false, problems: ['tokens.json must be a JSON object of token groups (got ' + (doc === null ? 'null' : Array.isArray(doc) ? 'an array' : typeof doc) + ')'] };
+  }
   const tokens = flattenTokens(doc);
 
   for (const g of ['color', 'typography', 'spacing', 'radius']) {
