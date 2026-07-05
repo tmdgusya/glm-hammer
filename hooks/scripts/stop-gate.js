@@ -30,6 +30,15 @@ const {
 
 const BLOCK_CAP = 6;
 const CRITICS = ['feasibility-critic', 'integration-critic', 'coverage-critic'];
+const { validateTokens, validateSpec } = require('./token-lib');
+const PROSPECT_REPORTS = [
+  'vein-reader',
+  'color-prospector',
+  'type-prospector',
+  'layout-prospector',
+  'motion-prospector',
+];
+const CRUCIBLE_PANEL = ['harmony-critic', 'rigor-critic'];
 const APPROVE = /VERDICT:\s*APPROVE/i;
 const PASS = /VERDICT:\s*PASS/i;
 const JUDGE = { minBytes: 300, requireChecks: true };
@@ -115,6 +124,90 @@ function forgeGate(cwd, state) {
   );
 }
 
+function crucibleGate(cwd, state) {
+  // Gate 1: prospecting receipts (raw reports, not judges)
+  const prospectEntries = PROSPECT_REPORTS.map((n) => ({ tail: `design/prospect/${n}.md`, kind: 'raw' }));
+  const prospect = receiptProblems(cwd, prospectEntries);
+  if (prospect.missing.length > 0) {
+    return (
+      `Crucible gate: prospecting incomplete — missing/empty reports: ${prospect.missing.join(', ')}. ` +
+      'Dispatch vein-reader first (storyline → direction brief), then the four prospectors in parallel; ' +
+      'each writes its report to its evidence path and ends with EVIDENCE_RECORDED: <path>.'
+    );
+  }
+
+  // Gate 2: design artifacts exist, pass deterministic checks, and are sealed
+  if (!state.design) {
+    return 'Crucible gate: state.design is not set. Set it to the design directory (docs/glm-hammer/design/YYYY-MM-DD-<name>) and write the artifacts there.';
+  }
+  const tokensAbs = path.resolve(cwd, state.design, 'tokens.json');
+  const specAbs = path.resolve(cwd, state.design, 'design-spec.md');
+  const tokensCheck = validateTokens(tokensAbs);
+  if (!tokensCheck.ok) {
+    return (
+      `Crucible gate: tokens.json fails deterministic validation:\n- ${tokensCheck.problems.slice(0, 12).join('\n- ')}\n` +
+      'Fix tokens.json via the Write/Edit tools (this reseals it), then re-run the assay and the panel.'
+    );
+  }
+  const specCheck = validateSpec(specAbs);
+  if (!specCheck.ok) {
+    return `Crucible gate: ${specCheck.problems.join('; ')}. Complete design-spec.md via the Write/Edit tools.`;
+  }
+  for (const abs of [tokensAbs, specAbs]) {
+    const seal = sealMatches(cwd, abs);
+    if (seal !== 'ok') {
+      if (((state.panel && state.panel.approved) || 0) > 0 || (state.assay && state.assay.verdict === 'approve')) {
+        state.assay = { verdict: 'pending', round: (state.assay && state.assay.round) || 1 };
+        state.panel = Object.assign({ required: 2, round: 1 }, state.panel, { approved: 0, verdicts: [] });
+        if (state.status === 'assay' || state.status === 'critique' || state.status === 'approved') {
+          state.status = 'smelting'; // same reset token-gate applies on tracked edits
+        }
+        writeState(cwd, state);
+      }
+      return (
+        `Crucible gate: the content seal on ${abs} is ${seal === 'broken' ? 'BROKEN — the file changed outside tracked editing' : 'MISSING — the file was never saved through the Write/Edit tools'}. ` +
+        'Assay and panel approvals are void. Re-save the intended content via the Write tool, then re-run the assay and the FULL panel.'
+      );
+    }
+  }
+
+  // Gate 3: fidelity assay receipt
+  const assayRound = (state.assay && state.assay.round) || 1;
+  const assay = receiptProblems(cwd, [
+    { tail: `design/assay/round-${assayRound}/fidelity-critic.md`, pattern: APPROVE, kind: 'judge' },
+  ]);
+  if (assay.unbacked.length > 0) {
+    return `Crucible gate: ${unbackedNote(assay.unbacked)}`;
+  }
+  if (assay.missing.length > 0 || !(state.assay && state.assay.verdict === 'approve')) {
+    return (
+      `Crucible gate: fidelity assay not green (round ${assayRound}). ` +
+      `${substanceNote()}Dispatch fidelity-critic with the design directory, the prospect receipts, and its evidence path ` +
+      `.glm-hammer/evidence/design/assay/round-${assayRound}/fidelity-critic.md. On REJECT, revise the tokens and re-assay (increment assay.round).`
+    );
+  }
+
+  // Gate 4: designer panel receipts
+  const panelRound = (state.panel && state.panel.round) || 1;
+  const panelEntries = CRUCIBLE_PANEL.map((n) => ({
+    tail: `design/panel/round-${panelRound}/${n}.md`,
+    pattern: APPROVE,
+    kind: 'judge',
+  }));
+  const panel = receiptProblems(cwd, panelEntries);
+  if (panel.unbacked.length > 0) {
+    return `Crucible gate: ${unbackedNote(panel.unbacked)}Approvals do not count until every receipt is dispatch-backed.`;
+  }
+  if (((state.panel && state.panel.approved) || 0) >= ((state.panel && state.panel.required) || 2) && panel.missing.length === 0) {
+    return null;
+  }
+  return (
+    `Crucible gate: designer panel incomplete — ${(state.panel && state.panel.approved) || 0}/${(state.panel && state.panel.required) || 2} APPROVE (round ${panelRound}); missing/invalid receipts: ${panel.missing.join(', ') || 'none'}. ` +
+    'Dispatch the full panel (harmony-critic, rigor-critic) on the current design, or revise it and re-run assay + panel. ' +
+    'If you are genuinely blocked on user input, set status to "awaiting-user" in .glm-hammer/state.json and ask the question.'
+  );
+}
+
 function hammerGate(cwd, state) {
   const t = state.tasks || { total: 0, completed: 0 };
   const r = state.reviews || { security: 'pending', qa: 'pending' };
@@ -195,6 +288,7 @@ try {
 
   let reason = null;
   if (state.phase === 'forge' && state.status !== 'done') reason = forgeGate(cwd, state);
+  else if (state.phase === 'crucible' && state.status !== 'done') reason = crucibleGate(cwd, state);
   else if (state.phase === 'hammer') reason = hammerGate(cwd, state); // "done" is re-verified against receipts
 
   if (!reason) process.exit(0);
