@@ -88,11 +88,11 @@ hooks는 서브에이전트를 직접 띄울 수 없으므로, 스킬이 `.glm-h
 ZCode 설치본(`zcode.cjs` v3.2.x)과 내장 `diagnosing-hooks` 가이드로 직접 검증한 내용:
 
 - 지원 이벤트는 **정확히 7개**: SessionStart, UserPromptSubmit, PreToolUse, PermissionRequest, PostToolUse, PostToolUseFailure, Stop. **SubagentStop/PreCompact/Notification 미지원** → 이 플러그인은 Stop 게이트만 사용
-- `${CLAUDE_PLUGIN_ROOT}` 치환, `statusMessage`, matcher(대소문자 구분 정규식) 지원. `Write`/`Edit` ← `ApplyPatch` 별칭 자동 매핑
+- `${ZCODE_PLUGIN_ROOT}` 치환, `statusMessage`, matcher(대소문자 구분 정규식) 지원. `Write`/`Edit` ← `ApplyPatch` 별칭 자동 매핑
 - **훅 stdout은 strict 스키마** — 허용 키 외에는 검증 실패. 그래서 모든 훅이 `additionalContext` 단일 키(또는 Stop의 `decision`/`reason`)만 출력
 - 크로스플랫폼 권장인 **`type: "process"`**(셸 미경유, `timeoutMs` 단위) 사용
 - Stop 차단으로 인한 연속 계속은 ZCode 런타임이 **최대 3회**로 제한 (자체 카운터와 별개)
-- 매니페스트는 `.zcode-plugin` → `.claude-plugin` → `.codex-plugin` 순으로 탐색 — 본 저장소의 `.claude-plugin/plugin.json` 그대로 인식됨
+- 매니페스트는 ZCode 최우선 탐색 위치인 `.zcode-plugin/plugin.json`에 있음 (탐색 순서: `.zcode-plugin` → `.claude-plugin` → `.codex-plugin`)
 - 플러그인 번들 **agents/lspServers는 현재 diagnostic-only**(UI 표시만, 미실행) → 스킬에 에이전트 정의 인라인 폴백 내장, LSP는 네이티브 컴포넌트 대신 `edit-diagnostics.js` 훅으로 구현
 
 ### Binary Judge (LLM-as-Judge)

@@ -88,11 +88,11 @@ Optional config at `.glm-hammer/diagnostics.json`:
 Verified directly against the ZCode distribution (`zcode.cjs` v3.2.x) and the built-in `diagnosing-hooks` guide:
 
 - Supported events are **exactly seven**: SessionStart, UserPromptSubmit, PreToolUse, PermissionRequest, PostToolUse, PostToolUseFailure, Stop. **SubagentStop/PreCompact/Notification are unsupported** → this plugin uses only the Stop gate
-- `${CLAUDE_PLUGIN_ROOT}` substitution, `statusMessage`, matcher (case-sensitive regex) are supported. `Write`/`Edit` ← `ApplyPatch` alias auto-mapping
+- `${ZCODE_PLUGIN_ROOT}` substitution, `statusMessage`, matcher (case-sensitive regex) are supported. `Write`/`Edit` ← `ApplyPatch` alias auto-mapping
 - **Hook stdout is a strict schema** — any key outside the allowed set fails validation. So every hook emits only the single `additionalContext` key (or `decision`/`reason` for Stop)
 - Uses the cross-platform-recommended **`type: "process"`** (no shell hop, `timeoutMs` unit)
 - Continued runs from a Stop block are capped at **3 by the ZCode runtime** (separate from this plugin's own counter)
-- Manifest is searched in order `.zcode-plugin` → `.claude-plugin` → `.codex-plugin` — this repo's `.claude-plugin/plugin.json` is recognized as-is
+- Manifest lives at `.zcode-plugin/plugin.json` — ZCode's first-priority search location (`.zcode-plugin` → `.claude-plugin` → `.codex-plugin`)
 - The plugin bundle's **agents/lspServers are currently diagnostic-only** (UI display, not executed) → skills carry an inline agent-definition fallback; LSP is implemented via the `edit-diagnostics.js` hook instead of a native component
 
 ### Binary Judge (LLM-as-Judge)

@@ -19,7 +19,7 @@ for (const f of fs.readdirSync(path.join(ROOT, 'hooks', 'scripts')).filter((f) =
 }
 
 // (b) JSON registrations parse
-for (const f of ['hooks/hooks.json', '.claude-plugin/plugin.json']) {
+for (const f of ['hooks/hooks.json', '.zcode-plugin/plugin.json']) {
   let ok = true;
   try { JSON.parse(fs.readFileSync(path.join(ROOT, f), 'utf8')); } catch { ok = false; }
   check(`${f} parses`, ok);

@@ -6,7 +6,7 @@
           {
             "type": "process",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.js"],
+            "args": ["${ZCODE_PLUGIN_ROOT}/hooks/scripts/session-start.js"],
             "timeoutMs": 10000,
             "statusMessage": "(glm-hammer) Checking for unfinished runs"
           }
@@ -19,7 +19,7 @@
           {
             "type": "process",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/route-intent.js"],
+            "args": ["${ZCODE_PLUGIN_ROOT}/hooks/scripts/route-intent.js"],
             "timeoutMs": 10000,
             "statusMessage": "(glm-hammer) Routing intent"
           }
@@ -33,28 +33,28 @@
           {
             "type": "process",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/plan-gate.js"],
+            "args": ["${ZCODE_PLUGIN_ROOT}/hooks/scripts/plan-gate.js"],
             "timeoutMs": 10000,
             "statusMessage": "(glm-hammer) Plan integrity gate"
           },
           {
             "type": "process",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/token-gate.js"],
+            "args": ["${ZCODE_PLUGIN_ROOT}/hooks/scripts/token-gate.js"],
             "timeoutMs": 10000,
             "statusMessage": "(glm-hammer) Design token gate"
           },
           {
             "type": "process",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/comment-checker.js"],
+            "args": ["${ZCODE_PLUGIN_ROOT}/hooks/scripts/comment-checker.js"],
             "timeoutMs": 10000,
             "statusMessage": "(glm-hammer) Checking comments"
           },
           {
             "type": "process",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/edit-diagnostics.js"],
+            "args": ["${ZCODE_PLUGIN_ROOT}/hooks/scripts/edit-diagnostics.js"],
             "timeoutMs": 15000,
             "statusMessage": "(glm-hammer) Syntax diagnostics"
           }
@@ -66,7 +66,7 @@
           {
             "type": "process",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/dispatch-log.js"],
+            "args": ["${ZCODE_PLUGIN_ROOT}/hooks/scripts/dispatch-log.js"],
             "timeoutMs": 10000,
             "statusMessage": "(glm-hammer) Recording dispatch ledger"
           }
@@ -79,7 +79,7 @@
           {
             "type": "process",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop-gate.js"],
+            "args": ["${ZCODE_PLUGIN_ROOT}/hooks/scripts/stop-gate.js"],
             "timeoutMs": 15000,
             "statusMessage": "(glm-hammer) Verifying gates and evidence receipts"
           }
