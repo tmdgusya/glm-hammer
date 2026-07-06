@@ -111,6 +111,8 @@
   .scene figcaption{display:flex;gap:var(--sp-xl);flex-wrap:wrap;margin-top:var(--sp-md);font-family:var(--font-mono);font-size:var(--fs-caption);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--text-subtle)}
   .scene figcaption b{color:var(--accent-default);font-weight:var(--w-label)}
   .flake{transform-box:fill-box;transform-origin:center;animation:snowfall linear infinite}
+  .flake-sway{animation:flakeSway 4s var(--ease-ember-flicker) infinite alternate}
+  @keyframes flakeSway{0%{transform:translateX(-3px)}50%{transform:translateX(3px)}100%{transform:translateX(-3px)}}
   .forge-glow{transform-box:fill-box;transform-origin:center;animation:forgeFlicker 3s var(--ease-ember-flicker) infinite alternate}
   .torch-glow{transform-box:fill-box;transform-origin:center;animation:torchFlicker 1.4s var(--ease-ember-flicker) infinite alternate}
   .smoke{transform-box:fill-box;transform-origin:center;animation:smokeRise 6s ease-out infinite}
@@ -148,7 +150,7 @@
     <h2><span class="n">·</span>To find the hammer, you climb the mountain</h2>
     <p class="journey-lead">No plan is born warm. Somewhere up on the ridge, in the only light for miles, a forge burns — and every line of code glm-hammer ships is struck there, under the snow, with the receipt to prove it.</p>
     <figure class="scene">
-      <svg viewBox="0 0 900 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A snowy mountain range at night. A single forge glows on the high ridge; a small traveler with a torch climbs a dotted trail toward it; snow falls throughout.">
+      <svg id="journey-scene" viewBox="0 0 900 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A snowy mountain range at night. A single forge glows on the high ridge; a small traveler with a torch climbs a dotted trail toward it; snow falls throughout.">
         <defs>
           <radialGradient id="moonHalo" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stop-color="#cfe3e8" stop-opacity="0.5"/>
@@ -159,10 +161,31 @@
             <stop offset="60%" stop-color="#d97b30" stop-opacity="0.18"/>
             <stop offset="100%" stop-color="#d97b30" stop-opacity="0"/>
           </radialGradient>
+          <filter id="smoke-filter" x="420" y="150" width="60" height="80" filterUnits="userSpaceOnUse">
+            <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="3" result="turb">
+              <animate attributeName="baseFrequency" values="0.015;0.025;0.015" dur="6s" repeatCount="indefinite"/>
+            </feTurbulence>
+            <feDisplacementMap in="SourceGraphic" in2="turb" scale="12"/>
+            <feGaussianBlur stdDeviation="1"/>
+          </filter>
+          <filter id="godrays" x="380" y="120" width="140" height="140" filterUnits="userSpaceOnUse">
+            <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="2" seed="7" result="gturb">
+              <animate attributeName="baseFrequency" values="0.01;0.016;0.01" dur="8s" repeatCount="indefinite"/>
+            </feTurbulence>
+            <feDisplacementMap in="SourceGraphic" in2="gturb" scale="18"/>
+            <feGaussianBlur stdDeviation="2"/>
+          </filter>
+          <filter id="grain-filter" x="0" y="0" width="900" height="440" filterUnits="userSpaceOnUse">
+            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="2" result="noise"/>
+            <feColorMatrix in="noise" type="luminanceToAlpha" result="alpha"/>
+            <feFlood flood-color="#cfe3e8" result="tint"/>
+            <feComposite in="tint" in2="alpha" operator="in" result="grain"/>
+            <feComposite in="grain" in2="SourceGraphic" operator="over"/>
+          </filter>
         </defs>
 
         <!-- night sky -->
-        <rect width="900" height="440" fill="#0e1a22"/>
+        <rect width="900" height="440" fill="#0e1a22" filter="url(#grain-filter)"/>
 
         <!-- stars -->
         <g fill="#84a7b1" opacity="0.55">
@@ -208,11 +231,19 @@
         </g>
 
         <!-- the forge on the high ridge -->
+        <g id="godrays-group" filter="url(#godrays)" opacity="0.5" transform="translate(450 232)">
+          <!-- ray polygons, each a thin triangle from origin fanning upward -->
+          <polygon points="0,0 -40,-120 -28,-120" fill="#ff8e57" opacity="0.35"/>
+          <polygon points="0,0 -18,-140 -8,-140" fill="#ff8e57" opacity="0.45"/>
+          <polygon points="0,0 6,-150 16,-150" fill="#d97b30" opacity="0.4"/>
+          <polygon points="0,0 28,-135 40,-135" fill="#ff8e57" opacity="0.35"/>
+          <polygon points="0,0 60,-110 72,-110" fill="#d97b30" opacity="0.25"/>
+        </g>
         <circle cx="450" cy="232" r="55" fill="url(#forgeFire)" class="forge-glow"/>
         <!-- chimney + smoke -->
         <rect x="447" y="200" width="6" height="12" fill="#2a211a"/>
-        <path class="smoke" d="M450 200 q-5 -10 2 -20 q7 -10 -2 -22" fill="none" stroke="#6b7d85" stroke-width="3" stroke-linecap="round"/>
-        <path class="smoke" style="animation-delay:-3s" d="M450 200 q-4 -8 1 -16 q6 -8 -1 -18" fill="none" stroke="#6b7d85" stroke-width="2.5" stroke-linecap="round"/>
+        <path class="smoke" filter="url(#smoke-filter)" d="M450 200 q-5 -10 2 -20 q7 -10 -2 -22" fill="none" stroke="#6b7d85" stroke-width="3" stroke-linecap="round"/>
+        <path class="smoke" filter="url(#smoke-filter)" style="animation-delay:-3s" d="M450 200 q-4 -8 1 -16 q6 -8 -1 -18" fill="none" stroke="#6b7d85" stroke-width="2.5" stroke-linecap="round"/>
         <!-- the little hut -->
         <path d="M432 236 L450 218 L468 236 Z" fill="#2a1a12" stroke="#d97b30" stroke-width="0.8"/>
         <rect x="434" y="236" width="32" height="12" fill="#2a211a" stroke="#3a2e22" stroke-width="0.8"/>
@@ -225,26 +256,26 @@
 
         <!-- snowfall -->
         <g fill="#efe7d6">
-          <circle class="flake" cx="60"  cy="-10"  r="1.6" style="animation-duration:8s;animation-delay:-2s"/>
-          <circle class="flake" cx="110" cy="-60"  r="2.2" style="animation-duration:10s;animation-delay:-5s"/>
-          <circle class="flake" cx="160" cy="-30"  r="1.4" style="animation-duration:7s;animation-delay:-1s"/>
-          <circle class="flake" cx="205" cy="-110" r="2.0" style="animation-duration:9s;animation-delay:-4s"/>
-          <circle class="flake" cx="255" cy="-80"  r="1.6" style="animation-duration:11s;animation-delay:-7s"/>
-          <circle class="flake" cx="300" cy="-15"  r="2.4" style="animation-duration:7s;animation-delay:-3s"/>
-          <circle class="flake" cx="345" cy="-95"  r="1.4" style="animation-duration:10s;animation-delay:-6s"/>
-          <circle class="flake" cx="390" cy="-50"  r="2.0" style="animation-duration:8s;animation-delay:-2s"/>
-          <circle class="flake" cx="435" cy="-130" r="1.6" style="animation-duration:9s;animation-delay:-5s"/>
-          <circle class="flake" cx="480" cy="-40"  r="2.2" style="animation-duration:11s;animation-delay:-8s"/>
-          <circle class="flake" cx="530" cy="-70"  r="1.4" style="animation-duration:7s;animation-delay:-1s"/>
-          <circle class="flake" cx="575" cy="-115" r="1.8" style="animation-duration:10s;animation-delay:-4s"/>
-          <circle class="flake" cx="620" cy="-25"  r="2.0" style="animation-duration:8s;animation-delay:-3s"/>
-          <circle class="flake" cx="665" cy="-90"  r="1.6" style="animation-duration:9s;animation-delay:-6s"/>
-          <circle class="flake" cx="710" cy="-55"  r="2.4" style="animation-duration:11s;animation-delay:-9s"/>
-          <circle class="flake" cx="755" cy="-105" r="1.4" style="animation-duration:7s;animation-delay:-2s"/>
-          <circle class="flake" cx="800" cy="-35"  r="2.0" style="animation-duration:10s;animation-delay:-5s"/>
-          <circle class="flake" cx="840" cy="-75"  r="1.6" style="animation-duration:8s;animation-delay:-4s"/>
-          <circle class="flake" cx="870" cy="-120" r="2.2" style="animation-duration:9s;animation-delay:-7s"/>
-          <circle class="flake" cx="415" cy="-160" r="1.4" style="animation-duration:11s;animation-delay:-10s"/>
+          <g class="flake-sway"><circle class="flake" cx="60"  cy="-10"  r="1.6" style="animation-duration:8s;animation-delay:-2s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="110" cy="-60"  r="2.2" style="animation-duration:10s;animation-delay:-5s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="160" cy="-30"  r="1.4" style="animation-duration:7s;animation-delay:-1s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="205" cy="-110" r="2.0" style="animation-duration:9s;animation-delay:-4s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="255" cy="-80"  r="1.6" style="animation-duration:11s;animation-delay:-7s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="300" cy="-15"  r="2.4" style="animation-duration:7s;animation-delay:-3s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="345" cy="-95"  r="1.4" style="animation-duration:10s;animation-delay:-6s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="390" cy="-50"  r="2.0" style="animation-duration:8s;animation-delay:-2s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="435" cy="-130" r="1.6" style="animation-duration:9s;animation-delay:-5s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="480" cy="-40"  r="2.2" style="animation-duration:11s;animation-delay:-8s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="530" cy="-70"  r="1.4" style="animation-duration:7s;animation-delay:-1s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="575" cy="-115" r="1.8" style="animation-duration:10s;animation-delay:-4s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="620" cy="-25"  r="2.0" style="animation-duration:8s;animation-delay:-3s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="665" cy="-90"  r="1.6" style="animation-duration:9s;animation-delay:-6s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="710" cy="-55"  r="2.4" style="animation-duration:11s;animation-delay:-9s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="755" cy="-105" r="1.4" style="animation-duration:7s;animation-delay:-2s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="800" cy="-35"  r="2.0" style="animation-duration:10s;animation-delay:-5s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="840" cy="-75"  r="1.6" style="animation-duration:8s;animation-delay:-4s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="870" cy="-120" r="2.2" style="animation-duration:9s;animation-delay:-7s"/></g>
+          <g class="flake-sway"><circle class="flake" cx="415" cy="-160" r="1.4" style="animation-duration:11s;animation-delay:-10s"/></g>
         </g>
       </svg>
       <figcaption>
@@ -490,5 +521,15 @@ claude plugin install glm-hammer@glm-hammer</code></pre>
   </div>
 </footer>
 
+<script>
+  (function(){
+    var svg=document.getElementById('journey-scene');
+    if(!svg)return;
+    var mq=window.matchMedia('(prefers-reduced-motion: reduce)');
+    function apply(){ if(mq.matches){svg.pauseAnimations();}else{svg.unpauseAnimations();} }
+    apply();
+    mq.addEventListener('change',apply);
+  })();
+</script>
 </body>
 </html>
