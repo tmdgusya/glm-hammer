@@ -102,6 +102,23 @@
   @keyframes emberFlicker{0%,100%{opacity:.6}50%{opacity:.9}}
   @keyframes heroSettle{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
+  /* journey — the climb to the smith (palette derived from :root tokens: surface/ember/cold/accent) */
+  .journey{background:linear-gradient(180deg,#0e1a22 0%,#14110d 55%,var(--surface-default) 100%);padding-block:var(--sp-4xl)}
+  .journey .kicker{font-family:var(--font-mono);text-transform:uppercase;font-size:var(--fs-caption);letter-spacing:var(--ls-label);color:var(--accent-cold);margin-bottom:var(--sp-2xs)}
+  .journey h2{margin-bottom:var(--sp-sm)}
+  .journey-lead{color:var(--text-muted);max-width:680px;margin-bottom:var(--sp-xl)}
+  .scene svg{display:block;width:100%;height:auto;border:1px solid var(--line-default);border-radius:var(--r-panel);background:#0e1a22}
+  .scene figcaption{display:flex;gap:var(--sp-xl);flex-wrap:wrap;margin-top:var(--sp-md);font-family:var(--font-mono);font-size:var(--fs-caption);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--text-subtle)}
+  .scene figcaption b{color:var(--accent-default);font-weight:var(--w-label)}
+  .flake{transform-box:fill-box;transform-origin:center;animation:snowfall linear infinite}
+  .forge-glow{transform-box:fill-box;transform-origin:center;animation:forgeFlicker 3s var(--ease-ember-flicker) infinite alternate}
+  .torch-glow{transform-box:fill-box;transform-origin:center;animation:torchFlicker 1.4s var(--ease-ember-flicker) infinite alternate}
+  .smoke{transform-box:fill-box;transform-origin:center;animation:smokeRise 6s ease-out infinite}
+  @keyframes snowfall{0%{transform:translateY(-24px);opacity:0}15%{opacity:.7}85%{opacity:.7}100%{transform:translateY(464px);opacity:0}}
+  @keyframes forgeFlicker{0%,100%{opacity:.5}50%{opacity:.95}}
+  @keyframes torchFlicker{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1.1)}}
+  @keyframes smokeRise{0%{transform:translateY(0);opacity:0}25%{opacity:.3}100%{transform:translateY(-50px);opacity:0}}
+
   @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -124,6 +141,119 @@
     </div>
   </div>
 </header>
+
+<section class="journey">
+  <div class="wrap">
+    <p class="kicker">the journey</p>
+    <h2><span class="n">·</span>To find the hammer, you climb the mountain</h2>
+    <p class="journey-lead">No plan is born warm. Somewhere up on the ridge, in the only light for miles, a forge burns — and every line of code glm-hammer ships is struck there, under the snow, with the receipt to prove it.</p>
+    <figure class="scene">
+      <svg viewBox="0 0 900 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A snowy mountain range at night. A single forge glows on the high ridge; a small traveler with a torch climbs a dotted trail toward it; snow falls throughout.">
+        <defs>
+          <radialGradient id="moonHalo" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#cfe3e8" stop-opacity="0.5"/>
+            <stop offset="100%" stop-color="#cfe3e8" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="forgeFire" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ff8e57" stop-opacity="0.55"/>
+            <stop offset="60%" stop-color="#d97b30" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#d97b30" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+
+        <!-- night sky -->
+        <rect width="900" height="440" fill="#0e1a22"/>
+
+        <!-- stars -->
+        <g fill="#84a7b1" opacity="0.55">
+          <circle cx="80" cy="50" r="0.9"/><circle cx="150" cy="90" r="0.7"/><circle cx="220" cy="40" r="1.1"/>
+          <circle cx="300" cy="110" r="0.7"/><circle cx="610" cy="60" r="1.0"/><circle cx="690" cy="100" r="0.8"/>
+          <circle cx="780" cy="50" r="0.9"/><circle cx="850" cy="120" r="0.7"/><circle cx="740" cy="160" r="0.6"/>
+        </g>
+
+        <!-- moon -->
+        <circle cx="660" cy="80" r="38" fill="url(#moonHalo)"/>
+        <circle cx="660" cy="80" r="14" fill="#cfe3e8" opacity="0.85"/>
+
+        <!-- far ridge -->
+        <path d="M0 290 L130 210 L260 250 L400 195 L540 235 L680 190 L820 220 L900 200 L900 300 L0 300 Z" fill="#16242b"/>
+        <!-- mid ridge -->
+        <path d="M0 330 L110 250 L250 295 L400 230 L540 270 L700 225 L830 255 L900 240 L900 360 L0 360 Z" fill="#1d2e35"/>
+        <!-- near ridge -->
+        <path d="M0 360 L120 270 L280 320 L450 260 L600 295 L760 255 L900 280 L900 440 L0 440 Z" fill="#243640"/>
+
+        <!-- snow on peaks (cream caps) -->
+        <path d="M110 252 L120 270 L130 252 L140 260 L150 250 L160 263 L120 270 Z" fill="#cfe3e8" opacity="0.7"/>
+        <path d="M395 232 L410 250 L420 240 L435 252 L445 242 L455 255 L420 250 Z" fill="#cfe3e8" opacity="0.7"/>
+        <path d="M690 225 L705 242 L720 230 L735 245 L705 242 Z" fill="#cfe3e8" opacity="0.7"/>
+        <path d="M115 272 L130 290 L145 275 L160 288 L175 273 L190 286 L130 290 Z" fill="#cfe3e8" opacity="0.6"/>
+        <path d="M435 262 L455 280 L475 265 L495 278 L515 266 L455 280 Z" fill="#cfe3e8" opacity="0.6"/>
+
+        <!-- a few pines clinging to the near slope -->
+        <g fill="#0e1a22">
+          <path d="M70 322 l7 -14 l7 14 z"/><path d="M180 312 l6 -12 l6 12 z"/><path d="M330 308 l7 -14 l7 14 z"/>
+          <path d="M560 300 l6 -12 l6 12 z"/><path d="M720 288 l7 -14 l7 14 z"/><path d="M830 300 l6 -12 l6 12 z"/>
+        </g>
+
+        <!-- the trail — dotted footprints up toward the forge -->
+        <path d="M110 425 Q190 395 240 350 Q300 310 360 285 Q410 265 440 252" fill="none" stroke="#3a5660" stroke-width="2.5" stroke-dasharray="2 7" stroke-linecap="round"/>
+
+        <!-- the traveler with a torch, mid-climb -->
+        <g transform="translate(215 348)">
+          <line x1="3" y1="-2" x2="13" y2="-10" stroke="#d97b30" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="14" cy="-12" r="6" fill="#ff8e57" class="torch-glow"/>
+          <circle cx="14" cy="-12" r="2.2" fill="#ffe7c0"/>
+          <circle r="4.5" fill="#efe7d6"/>
+          <rect x="-3" y="3" width="6" height="9" rx="2" fill="#efe7d6"/>
+        </g>
+
+        <!-- the forge on the high ridge -->
+        <circle cx="450" cy="232" r="55" fill="url(#forgeFire)" class="forge-glow"/>
+        <!-- chimney + smoke -->
+        <rect x="447" y="200" width="6" height="12" fill="#2a211a"/>
+        <path class="smoke" d="M450 200 q-5 -10 2 -20 q7 -10 -2 -22" fill="none" stroke="#6b7d85" stroke-width="3" stroke-linecap="round"/>
+        <path class="smoke" style="animation-delay:-3s" d="M450 200 q-4 -8 1 -16 q6 -8 -1 -18" fill="none" stroke="#6b7d85" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- the little hut -->
+        <path d="M432 236 L450 218 L468 236 Z" fill="#2a1a12" stroke="#d97b30" stroke-width="0.8"/>
+        <rect x="434" y="236" width="32" height="12" fill="#2a211a" stroke="#3a2e22" stroke-width="0.8"/>
+        <rect x="445" y="240" width="10" height="8" fill="#ff8e57" opacity="0.9"/>
+        <!-- the hammer silhouette planted before the forge -->
+        <g transform="translate(450 252)" fill="#d97b30">
+          <rect x="-2.5" y="-14" width="5" height="20" rx="1"/>
+          <rect x="-9" y="-20" width="18" height="8" rx="1.5"/>
+        </g>
+
+        <!-- snowfall -->
+        <g fill="#efe7d6">
+          <circle class="flake" cx="60"  cy="-10"  r="1.6" style="animation-duration:8s;animation-delay:-2s"/>
+          <circle class="flake" cx="110" cy="-60"  r="2.2" style="animation-duration:10s;animation-delay:-5s"/>
+          <circle class="flake" cx="160" cy="-30"  r="1.4" style="animation-duration:7s;animation-delay:-1s"/>
+          <circle class="flake" cx="205" cy="-110" r="2.0" style="animation-duration:9s;animation-delay:-4s"/>
+          <circle class="flake" cx="255" cy="-80"  r="1.6" style="animation-duration:11s;animation-delay:-7s"/>
+          <circle class="flake" cx="300" cy="-15"  r="2.4" style="animation-duration:7s;animation-delay:-3s"/>
+          <circle class="flake" cx="345" cy="-95"  r="1.4" style="animation-duration:10s;animation-delay:-6s"/>
+          <circle class="flake" cx="390" cy="-50"  r="2.0" style="animation-duration:8s;animation-delay:-2s"/>
+          <circle class="flake" cx="435" cy="-130" r="1.6" style="animation-duration:9s;animation-delay:-5s"/>
+          <circle class="flake" cx="480" cy="-40"  r="2.2" style="animation-duration:11s;animation-delay:-8s"/>
+          <circle class="flake" cx="530" cy="-70"  r="1.4" style="animation-duration:7s;animation-delay:-1s"/>
+          <circle class="flake" cx="575" cy="-115" r="1.8" style="animation-duration:10s;animation-delay:-4s"/>
+          <circle class="flake" cx="620" cy="-25"  r="2.0" style="animation-duration:8s;animation-delay:-3s"/>
+          <circle class="flake" cx="665" cy="-90"  r="1.6" style="animation-duration:9s;animation-delay:-6s"/>
+          <circle class="flake" cx="710" cy="-55"  r="2.4" style="animation-duration:11s;animation-delay:-9s"/>
+          <circle class="flake" cx="755" cy="-105" r="1.4" style="animation-duration:7s;animation-delay:-2s"/>
+          <circle class="flake" cx="800" cy="-35"  r="2.0" style="animation-duration:10s;animation-delay:-5s"/>
+          <circle class="flake" cx="840" cy="-75"  r="1.6" style="animation-duration:8s;animation-delay:-4s"/>
+          <circle class="flake" cx="870" cy="-120" r="2.2" style="animation-duration:9s;animation-delay:-7s"/>
+          <circle class="flake" cx="415" cy="-160" r="1.4" style="animation-duration:11s;animation-delay:-10s"/>
+        </g>
+      </svg>
+      <figcaption>
+        <span>fig 01 · <b>the climb to the smith</b></span>
+        <span>a single light on the ridge — every strike proven under the snow</span>
+      </figcaption>
+    </figure>
+  </div>
+</section>
 
 <section>
   <div class="wrap">
