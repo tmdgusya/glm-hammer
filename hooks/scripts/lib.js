@@ -190,10 +190,16 @@ function emit(obj) {
 }
 
 // Context injection. ZCode validates hook stdout against a STRICT schema
-// (extra keys fail validation); top-level `additionalContext` is accepted for
-// every event and is injected into the conversation, so emit only that.
-function emitContext(_eventName, text) {
-  emit({ additionalContext: text });
+// (extra keys fail validation) and accepts top-level `additionalContext`.
+// Claude Code expects `hookSpecificOutput.{hookEventName,additionalContext}`.
+// The Claude path is opt-in via GLM_HAMMER_EMIT=claude (set by claude-hammer),
+// so the default (ZCode) branch below is unchanged.
+function emitContext(eventName, text) {
+  if (process.env.GLM_HAMMER_EMIT === 'claude') {
+    emit({ hookSpecificOutput: { hookEventName: eventName, additionalContext: text } });
+  } else {
+    emit({ additionalContext: text });
+  }
 }
 
 module.exports = {

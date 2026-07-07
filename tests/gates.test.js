@@ -195,4 +195,29 @@ for (const f of [
   check(`${f} exists`, fs.existsSync(path.join(ROOT, f)));
 }
 
+// (k) emitContext dual-mode: ZCode default vs explicit Claude switch
+function emitOnce(extraEnv) {
+  const code = "require(process.argv[1]).emitContext('PostToolUse','hello')";
+  const r = spawnSync(process.execPath, ['-e', code, path.join(ROOT, 'hooks', 'scripts', 'lib.js')], {
+    env: Object.assign({}, process.env, extraEnv),
+    encoding: 'utf8',
+  });
+  return JSON.parse(r.stdout);
+}
+const zcodeOut = emitOnce({ GLM_HAMMER_EMIT: '' });
+check(
+  'emitContext ZCode schema (default)',
+  zcodeOut.additionalContext === 'hello' && zcodeOut.hookSpecificOutput === undefined,
+  JSON.stringify(zcodeOut)
+);
+const claudeOut = emitOnce({ GLM_HAMMER_EMIT: 'claude' });
+check(
+  'emitContext Claude schema (switch on)',
+  !!claudeOut.hookSpecificOutput &&
+    claudeOut.hookSpecificOutput.hookEventName === 'PostToolUse' &&
+    claudeOut.hookSpecificOutput.additionalContext === 'hello' &&
+    claudeOut.additionalContext === undefined,
+  JSON.stringify(claudeOut)
+);
+
 process.exit(failures ? 1 : 0);
