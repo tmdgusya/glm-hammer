@@ -130,18 +130,25 @@ Reached once the HTML deck product is complete (building green, and — when arm
 
 Entered only on an explicit yes from Phase A.
 
-1. **⟨state: exporting⟩ — run the converter.** Produce the editable deck with the runtime converter:
-   ```
-   python skills/pptxx/scripts/md2pptx.py <deck-dir> [<design>/tokens.json]
-   ```
-   It parses `<deck-dir>/slides.md` and writes `<deck-dir>/<basename>.pptx` (slide count on stdout, exit 0). The optional tokens argument styles the deck best-effort; a missing/unparseable tokens file falls back to default styling (never a crash).
+1. **⟨state: exporting⟩ — capture rasters, then run the converter.** The export is two stages: first capture the rendered deck to per-slide rasters, then pour them full-bleed into the pptx.
+   - **(a) Capture** each `<section class="slide" id="slide-NN">` to `<deck-dir>/shots/slide-NN.png` (NN from the deck's own slide order, 1280×720) with the runtime screenshotter:
+     ```
+     NODE_PATH="<global node_modules>" node skills/pptxx/scripts/capture_shots.cjs <deck-dir>
+     ```
+     It reuses the M1 frozen capture conditions verbatim — `javaScriptEnabled: false`, a deny-by-default request block, element-level `#slide-NN` capture at the 1280×720 viewport (addressing contract: `docs/engineering-discipline/harness/pptxx-skill/planning/spikes/screenshot/README.md`). The allowlist widens one notch from the spike's "deck file only" to "any local `file://` resource inside the deck subtree" so a deck's own `images/` render — but every remote / escaping / non-file request is still aborted (offline-safe). Playwright is resolved through `NODE_PATH` pointing at the global install; the script declares no dependency.
+   - **(b) Convert** with the runtime converter:
+     ```
+     python skills/pptxx/scripts/md2pptx.py <deck-dir> [<design>/tokens.json]
+     ```
+     **Full-bleed export (default):** when `<deck-dir>/shots/slide-NN.png` exists for a slide's 1-based position, it is poured as exactly one picture covering the whole slide — pixel-perfect fidelity to the HTML deck (colors, layout, SVG, gradients all preserved); title/body text are omitted by design, speaker notes are kept as the presenter memo. When no raster exists for a position, that slide falls back to the text render (title + bullets; a diagram fence falls back to its own `shots/slide-NN.png` or title-only + demoted notes). The optional tokens argument styles the *fallback* text render best-effort; a missing/unparseable tokens file falls back to default styling (never a crash). It writes `<deck-dir>/<basename>.pptx` (slide count on stdout, exit 0).
 2. **The gate stays armed through `exporting`.** Per the §0 gate branch table, `exporting` is a **branch ①②③** status: the deck seal set and the build/receipt requirements remain enforced exactly as they are for `visual-qa` and hybrid-`done`. This support landed in M2 — the hooks are untouched by this phase; you are only consuming a status the gate already understands.
-3. **Install guidance:** the converter depends on **python-pptx** (and Pillow). The dev environment has these preinstalled (python-pptx 1.0.2 · Pillow 12.2.0 — M1). For an end user, install with:
+3. **Install guidance:** the converter depends on **python-pptx** (and Pillow); the capture stage depends on **Playwright** + a Chromium binary. The dev environment has these preinstalled (python-pptx 1.0.2 · Pillow 12.2.0 — M1; Playwright 1.61.1 + chromium globally). For an end user, install with:
    ```
    pip install python-pptx
+   npm install -g playwright && npx playwright install chromium
    ```
-4. **Python-absent fallback → ⟨state: done⟩.** If `python` or `python-pptx` is unavailable, **do not force the export and do not crash** — skip the pptx and terminate on the HTML deck (`done`). The PPTX is an add-on; the HTML product is already complete from M4, so the fallback is harmless.
-5. **Path restriction is the converter's own defense.** `md2pptx.py` resolves image and shots references **only inside `<deck-dir>` (incl. `shots/`)** and refuses any absolute / `file://` / `http(s)://` / `..`-escape / non-image reference with a nonzero exit (C-3 path allowlist). You never need to sanitize refs by hand — the converter is the boundary.
+4. **Python- or Playwright-absent fallback → ⟨state: done⟩.** If `python` / `python-pptx` is unavailable, **do not force the export and do not crash** — skip the pptx and terminate on the HTML deck (`done`). If the **capture** stage fails (Playwright / Chromium absent, or the shotter exits non-zero), skip the capture and still run `md2pptx.py` — it falls back to the text render for every slide, so a Playwright-absent machine still produces a (plainer) pptx rather than failing. The PPTX is an add-on; the HTML product is already complete from M4, so every fallback is harmless.
+5. **Path restriction is the boundary's own defense.** `md2pptx.py` resolves image and shots references **only inside `<deck-dir>` (incl. `shots/`)** and refuses any absolute / `file://` / `http(s)://` / `..`-escape / non-image reference with a nonzero exit (C-3 path allowlist). `capture_shots.cjs` loads only `index.html` under the deck subtree and aborts every non-local / escaping request. You never need to sanitize refs by hand — the two scripts are the boundary.
 6. **Complete → ⟨state: done⟩.**
 
 ### Terminal ⟨state: done⟩

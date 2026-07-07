@@ -8,8 +8,13 @@ Hardens `planning/spikes/pptx/md2pptx-spike.py` into a deck-directory CLI:
 - Resolves image / shots references ONLY inside `<deck-dir>` (incl. `<deck-dir>/shots/`);
   absolute, `file://` / `http(s)://`, `..`-escape, and non-image extensions are REFUSED
   with a nonzero exit (path allowlist — §0 "md2pptx path allowlist = deck directory").
-- Diagram export policy: `<deck-dir>/shots/slide-<NN>.png` present -> exactly one picture
-  shape; absent -> title only + description demoted into (non-empty) speaker notes, 0 pictures.
+- Full-bleed export (default): when `<deck-dir>/shots/slide-<NN>.png` exists for a slide's
+  1-based position NN, that raster is poured as exactly ONE picture covering the whole
+  slide (pixel-perfect fidelity to the HTML deck); title/body text are omitted by design.
+  Capture the rasters with `scripts/capture_shots.cjs <deck-dir>` (Playwright, offline-safe).
+- Diagram export policy (fallback, no full-bleed raster for the slide): a diagram block's
+  own `shots/slide-<NN>.png` present -> exactly one picture shape; absent -> title only +
+  description demoted into (non-empty) speaker notes, 0 pictures.
 - Tokens are best-effort: the optional `<tokens.json>` arg, else `<deck-dir>/tokens.json`,
   else built-in defaults — a missing / unparseable tokens file never crashes (exit 0).
 - Output: `<deck-dir>/<basename>.pptx` (overwrite allowed). Prints a slide-count summary.
@@ -179,17 +184,32 @@ def build(deck_dir, tk):
     prs.slide_width, prs.slide_height = SLIDE_W, SLIDE_H
     blank = prs.slide_layouts[6]
 
-    for s in slides_md:
+    for idx, s in enumerate(slides_md, 1):
         slide = prs.slides.add_slide(blank)
         slide.background.fill.solid()
         slide.background.fill.fore_color.rgb = tk["surface"]
+
+        notes = s["notes"]
+
+        # Full-bleed export (default path): if a raster exists for this slide's
+        # 1-based position, pour it as one picture covering the whole slide —
+        # pixel-perfect fidelity to the HTML deck. Title/body text are omitted
+        # by design; speaker notes are preserved as the presenter's memo.
+        pos = "{:02d}".format(idx)
+        full_bleed = os.path.join(shots_dir, "slide-{}.png".format(pos))
+        if os.path.exists(full_bleed):
+            slide.shapes.add_picture(full_bleed, Emu(0), Emu(0), SLIDE_W, SLIDE_H)
+            if notes:
+                slide.notes_slide.notes_text_frame.text = notes
+            continue
+
+        # --- text-render fallback (no full-bleed raster for this slide) ---
 
         # Hardening guard (C-2): a title-less slide gets a placeholder, never a crash.
         title = s["title"] if s["title"] else "(untitled slide)"
         add_text(slide, title, MARGIN, Emu(600000), SLIDE_W - 2 * MARGIN,
                  Emu(900000), tk["size_title"], tk["text"], tk["font"], bold=True)
 
-        notes = s["notes"]
         y = Emu(1700000)
 
         if s["diagram"]:

@@ -1,3 +1,4 @@
 node_modules/
 .glm-hammer/
 .claude/
+__pycache__/
