@@ -47,6 +47,13 @@
           {
             "type": "process",
             "command": "node",
+            "args": ["${ZCODE_PLUGIN_ROOT}/hooks/scripts/deck-gate.js"],
+            "timeoutMs": 10000,
+            "statusMessage": "(glm-hammer) Deck integrity gate"
+          },
+          {
+            "type": "process",
+            "command": "node",
             "args": ["${ZCODE_PLUGIN_ROOT}/hooks/scripts/comment-checker.js"],
             "timeoutMs": 10000,
             "statusMessage": "(glm-hammer) Checking comments"

@@ -1,0 +1,76 @@
+{
+  "query": "https://api.openverse.org/v1/images/?q=mountain&license=cc0,pdm&mature=false&page_size=5",
+  "retrieved": "2026-07-07",
+  "results": [
+    {
+      "id": "eaed97d9-d875-4e2a-ba49-3c2244e2a1ba",
+      "title": "Mountain",
+      "license": "pdm",
+      "license_version": "1.0",
+      "creator": "Pat Dryburgh",
+      "source_url": "https://www.flickr.com/photos/7544495@N02/8339296677",
+      "image_url": "https://live.staticflickr.com/8221/8339296677_2e0534488d_b.jpg",
+      "width": 1024,
+      "height": 683,
+      "provider": "flickr",
+      "filesize": null,
+      "filetype": null
+    },
+    {
+      "id": "ea778275-c06c-4bb9-b71e-8bae9d24333f",
+      "title": "Lake McDonald with Mt. Cannon, Mt. Brown, Little Matterhorn, Mt. Edwards, and Gunsight Mountain",
+      "license": "pdm",
+      "license_version": "1.0",
+      "creator": "GlacierNPS",
+      "source_url": "https://www.flickr.com/photos/43288043@N04/12091853594",
+      "image_url": "https://live.staticflickr.com/3784/12091853594_b6f2668721_b.jpg",
+      "width": 1024,
+      "height": 681,
+      "provider": "flickr",
+      "filesize": null,
+      "filetype": null
+    },
+    {
+      "id": "89f5ff02-d895-455c-9c9c-cd8dd934c8bf",
+      "title": "You Looking at Me? Mountains goats in Glacier National Park, Montana",
+      "license": "cc0",
+      "license_version": "1.0",
+      "creator": "U.S. Geological Survey",
+      "source_url": "https://www.flickr.com/photos/27784370@N05/13974169513",
+      "image_url": "https://live.staticflickr.com/5550/13974169513_5e21ce9b9a.jpg",
+      "width": 500,
+      "height": 339,
+      "provider": "flickr",
+      "filesize": null,
+      "filetype": null
+    },
+    {
+      "id": "6ccf3cee-52b4-48e6-a5e4-5e6a12c96d71",
+      "title": "View from Ryan Mountain trail",
+      "license": "pdm",
+      "license_version": "1.0",
+      "creator": "Joshua Tree National Park",
+      "source_url": "https://www.flickr.com/photos/115357548@N08/12489282175",
+      "image_url": "https://live.staticflickr.com/3678/12489282175_cbeb44e052_b.jpg",
+      "width": 1024,
+      "height": 768,
+      "provider": "flickr",
+      "filesize": null,
+      "filetype": null
+    },
+    {
+      "id": "e2eb7145-6c4d-4a8a-89ff-0467654ebd89",
+      "title": "Chimney Tops Great Smoky Mountains",
+      "license": "pdm",
+      "license_version": "1.0",
+      "creator": "mrksteele04",
+      "source_url": "https://www.flickr.com/photos/158934835@N04/48932847298",
+      "image_url": "https://live.staticflickr.com/65535/48932847298_6f73d7c2aa_b.jpg",
+      "width": 1024,
+      "height": 683,
+      "provider": "flickr",
+      "filesize": null,
+      "filetype": null
+    }
+  ]
+}

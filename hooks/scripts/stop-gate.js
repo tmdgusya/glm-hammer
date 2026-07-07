@@ -15,6 +15,7 @@
 //
 // Escape hatches: status "awaiting-user" / context-pressure markers / block cap
 // (ZCode's runtime additionally caps Stop continuations at 3 per turn).
+const fs = require('fs');
 const path = require('path');
 const {
   readStdin,
@@ -24,6 +25,7 @@ const {
   evidenceOk,
   underContextPressure,
   sealMatches,
+  sha256File,
   readDispatchedTails,
   emit,
 } = require('./lib');
@@ -274,6 +276,161 @@ function hammerGate(cwd, state) {
   return null;
 }
 
+// ---- pptxx deck gate (§0 frozen contract) -----------------------------------
+// Branch-③ manifest scan extensions / license allowlist (§0 frozen values;
+// they live here rather than deck-gate.js because manifest verification is a
+// Stop-gate concern).
+const IMAGE_EXT = /\.(?:png|jpe?g|gif|webp|svg)$/i;
+const LICENSE_ALLOW = new Set(['cc0', 'pdm', 'cc-by', 'cc-by-sa']);
+const DECK_SEALED = ['slides.md', 'index.html'];
+
+// attributions.md row grammar (frozen):
+// | images/photo1.jpg | <sha256> | https://... | cc-by | <author> |
+// Pipe-leading lines are cell-split; header/separator lines are skipped;
+// only lines with >= 5 cells count as rows. Paths are deck-relative,
+// forward-slash.
+function manifestRows(text) {
+  const rows = new Map();
+  for (const line of text.split('\n')) {
+    if (!line.trim().startsWith('|')) continue;
+    const cells = line.split('|').map((c) => c.trim());
+    if (cells.length && cells[0] === '') cells.shift();
+    if (cells.length && cells[cells.length - 1] === '') cells.pop();
+    if (cells.length < 5) continue;
+    if (cells.every((c) => /^:?-+:?$/.test(c) || c === '')) continue; // separator row
+    if (/^(?:path|file)$/i.test(cells[0]) && /^sha-?256$/i.test(cells[1])) continue; // header row
+    rows.set(cells[0].replace(/\\/g, '/'), cells);
+  }
+  return rows;
+}
+
+function pptxxManifestProblem(cwd, state, panelRound) {
+  try {
+    const deckAbs = path.resolve(cwd, state.deck);
+    const images = [];
+    (function walk(dir, rel) {
+      for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (ent.isDirectory()) {
+          if (ent.name.toLowerCase() === 'shots') continue; // screenshots are scan-exempt
+          walk(path.join(dir, ent.name), rel ? `${rel}/${ent.name}` : ent.name);
+        } else if (IMAGE_EXT.test(ent.name)) {
+          images.push(rel ? `${rel}/${ent.name}` : ent.name);
+        }
+      }
+    })(deckAbs, '');
+    if (images.length === 0) return null;
+
+    const rows = manifestRows(fs.readFileSync(path.join(deckAbs, 'attributions.md'), 'utf8'));
+    const problems = [];
+    for (const rel of images) {
+      const row = rows.get(rel);
+      if (!row) {
+        problems.push(`${rel}: no attributions.md row`);
+        continue;
+      }
+      const actual = sha256File(path.join(deckAbs, ...rel.split('/')));
+      if (!actual || actual.toLowerCase() !== String(row[1] || '').toLowerCase()) {
+        problems.push(`${rel}: sha256 mismatch against the manifest`);
+        continue;
+      }
+      const license = String(row[3] || '').toLowerCase().split(/\s+/)[0];
+      const confirmed = row.some((c) => /(?:^|\s)user-confirmed(?:\s|$)/i.test(c));
+      if (!LICENSE_ALLOW.has(license) && !confirmed) {
+        problems.push(`${rel}: license "${license || '(missing)'}" not in {cc0, pdm, cc-by, cc-by-sa} and no user-confirmed token`);
+      }
+    }
+    if (problems.length === 0) return null;
+    return (
+      `pptxx gate: image integrity manifest failed — ${problems.join('; ')}. ` +
+      `Every image under ${state.deck} (shots/ excepted) needs an attributions.md row "| <deck-relative-path> | <sha256> | <source-url> | <license> | <author> |" ` +
+      `with an allowlisted license or a user-confirmed token. Fix attributions.md via the Write tool (this reseals it), then re-run the image panel (round ${panelRound}).`
+    );
+  } catch (err) {
+    // §0 fail-closed: scan/parse errors inside the armed scope block, never pass.
+    return (
+      `pptxx gate: image manifest verification errored (${err && err.message ? err.message : 'fs error'}) — failing closed. ` +
+      `Ensure ${state.deck} is readable and attributions.md contains the manifest table, then stop again.`
+    );
+  }
+}
+
+function pptxxGate(cwd, state) {
+  const vq = state.visualQa || {};
+  const ip = state.imagePanel || {};
+  const armed = vq.required === true || ip.required === 1;
+
+  // ⓪ §0 fail-closed — the one exception to fail-open, for ALL statuses and
+  // BEFORE done-skip: armed flags with no deck path means the evidence can no
+  // longer be located, so nothing can be verified.
+  if (armed && !state.deck) {
+    return (
+      'pptxx gate: quality flags are armed (visualQa.required/imagePanel.required) but state.deck is missing — failing closed. ' +
+      'Restore "deck" in .glm-hammer/state.json to the deck directory (docs/glm-hammer/decks/YYYY-MM-DD-<name>) so seals and receipts can be verified.'
+    );
+  }
+
+  // done-skip: a finished run with no deck (unarmed — ⓪ ran first) is silent.
+  if (state.status === 'done' && !state.deck) return null;
+
+  // ④ early statuses demand nothing yet. awaiting-user never reaches here —
+  // the common guard handles it before phase dispatch.
+  if (state.status !== 'visual-qa' && state.status !== 'exporting' && state.status !== 'done') return null;
+
+  // ① seal set + build receipt (whenever a deck exists; hybrid-done re-verifies).
+  if (state.deck) {
+    const deckAbs = path.resolve(cwd, state.deck);
+    const sealedNames = ip.required === 1 ? DECK_SEALED.concat('attributions.md') : DECK_SEALED;
+    for (const name of sealedNames) {
+      const seal = sealMatches(cwd, path.join(deckAbs, name));
+      if (seal !== 'ok') {
+        return (
+          `pptxx gate: the content seal on ${state.deck}/${name} is ${seal === 'broken' ? 'BROKEN — the file changed outside tracked editing (e.g. via shell redirection)' : 'MISSING — the file was never saved through the Write/Edit tools'}. ` +
+          'Re-save the exact intended content via the Write tool (this reseals it), then satisfy the remaining deck gates.'
+        );
+      }
+    }
+    const build = receiptProblems(cwd, [{ tail: 'deck/build.md', kind: 'raw' }]);
+    if (build.missing.length > 0) {
+      return (
+        'pptxx gate: deck build receipt missing or empty: .glm-hammer/evidence/deck/build.md. ' +
+        'Record the real build/render output there when building completes, then stop again.'
+      );
+    }
+  }
+
+  // ② visual QA judge (dispatch-backed).
+  if (vq.required === true) {
+    const round = vq.round || 1;
+    const tail = `deck/visual-qa/round-${round}/visual-qa-critic.md`;
+    const r = receiptProblems(cwd, [{ tail, pattern: APPROVE, kind: 'judge' }]);
+    if (r.unbacked.length > 0) return `pptxx gate: ${unbackedNote(r.unbacked)}`;
+    if (r.missing.length > 0) {
+      return (
+        `pptxx gate: visual QA not green (round ${round}) — missing, insubstantial, or lacking "VERDICT: APPROVE": ${r.missing.join(', ')}. ` +
+        `${substanceNote()}Dispatch visual-qa-critic on the current shots/ with its evidence path .glm-hammer/evidence/${tail}. On REJECT, fix the deck (tracked edits bump the round) and re-dispatch.`
+      );
+    }
+  }
+
+  // ③ image panel judge (dispatch-backed) + integrity manifest.
+  if (ip.required === 1) {
+    const round = ip.round || 1;
+    const tail = `deck/panel/round-${round}/image-suitability-critic.md`;
+    const r = receiptProblems(cwd, [{ tail, pattern: APPROVE, kind: 'judge' }]);
+    if (r.unbacked.length > 0) return `pptxx gate: ${unbackedNote(r.unbacked)}`;
+    if (r.missing.length > 0) {
+      return (
+        `pptxx gate: image panel not green (round ${round}) — missing, insubstantial, or lacking "VERDICT: APPROVE": ${r.missing.join(', ')}. ` +
+        `${substanceNote()}Dispatch image-suitability-critic with the deck images, attributions.md, and its evidence path .glm-hammer/evidence/${tail}.`
+      );
+    }
+    const manifestProblem = pptxxManifestProblem(cwd, state, round);
+    if (manifestProblem) return manifestProblem;
+  }
+
+  return null;
+}
+
 try {
   const input = readStdin();
   const cwd = input.cwd || process.cwd();
@@ -290,6 +447,7 @@ try {
   if (state.phase === 'forge' && state.status !== 'done') reason = forgeGate(cwd, state);
   else if (state.phase === 'crucible' && state.status !== 'done') reason = crucibleGate(cwd, state);
   else if (state.phase === 'hammer') reason = hammerGate(cwd, state); // "done" is re-verified against receipts
+  else if (state.phase === 'pptxx') reason = pptxxGate(cwd, state); // "done" is hybrid: re-verified while state.deck exists
 
   if (!reason) process.exit(0);
 

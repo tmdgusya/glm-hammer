@@ -43,6 +43,7 @@ Maintain `.glm-hammer/state.json` at the project root. Update it at every checkp
 Rules:
 - Set `status: "awaiting-user"` **before ending a turn that needs a user answer** (direction confirmation, deadlock, handoff). Otherwise the Stop hook will bounce you back.
 - Never write `approved` yourself unless `assay.verdict` is `"approve"` AND `panel.approved >= panel.required` in the current round with matching receipts on disk. The hooks cross-check this; falsifying state is a protocol violation.
+- Preserve top-level `resume`, `deck`, and `slides` keys across every state rewrite — a chaining skill owns them; clear `resume` only when writing the terminal status `done`.
 - Add `.glm-hammer/` to `.gitignore` if the project has one and it is not already listed.
 
 ## Process
@@ -102,6 +103,7 @@ If the runtime does not expose the critics as named agent types, read each defin
 Present a compact summary: the direction (one line), reference count, token group counts, and how many assay/panel rounds the design survived — with the design directory path. Ask ONE question: **이 디자인으로 forge를 진행할까요?**
 
 - Yes → set status `approved` ⟨state: approved is set only now⟩, then invoke the `forge` skill immediately with the design directory as a declared input. Forge's plan must list `design-spec.md` and `tokens.json` as inputs so hammer implements against them.
+- If `state.resume` is set (a chaining skill called crucible): skip ONLY the forge hand-off above — still present the design and require the user's acceptance; on acceptance set status `approved`, then return immediately to the skill named in `resume` (its return merge clears `resume`).
 - User declines (design-only run) → set status `done` so the resume/router hooks stop treating the run as active.
 - Revisions requested → apply them (this voids assay + panel), re-run Phase C and Phase D, re-present.
 

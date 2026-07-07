@@ -1,0 +1,37 @@
+{
+  "query": "https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrsearch=filetype:bitmap+mountain&gsrnamespace=6&gsrlimit=20&prop=imageinfo&iiprop=url|extmetadata|size&iiurlwidth=1024",
+  "note": "haslicense:cc0 CirrusSearch keyword unsupported (\"haslicense keyword contains no valid arguments\" warning) — client-side filtered on extmetadata.LicenseShortName matching /^(CC0|Public domain)/i",
+  "retrieved": "2026-07-07",
+  "results": [
+    {
+      "title": "File:Ansel Adams - Farm workers and Mt. Williamson.jpg",
+      "license": "Public domain",
+      "creator": "Ansel Adams",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Ansel_Adams_-_Farm_workers_and_Mt._Williamson.jpg",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/9/94/Ansel_Adams_-_Farm_workers_and_Mt._Williamson.jpg",
+      "thumb_url_1024": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/Ansel_Adams_-_Farm_workers_and_Mt._Williamson.jpg/1280px-Ansel_Adams_-_Farm_workers_and_Mt._Williamson.jpg",
+      "width": 2000,
+      "height": 1500
+    },
+    {
+      "title": "File:Himalayas.jpg",
+      "license": "Public domain",
+      "creator": "NASA",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Himalayas.jpg",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/7/79/Himalayas.jpg",
+      "thumb_url_1024": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Himalayas.jpg/1280px-Himalayas.jpg",
+      "width": 3032,
+      "height": 1998
+    },
+    {
+      "title": "File:Flickr - The U.S. Army - Jump over Mt. Rainier.jpg",
+      "license": "Public domain",
+      "creator": "The U.S. Army",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Flickr_-_The_U.S._Army_-_Jump_over_Mt._Rainier.jpg",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Flickr_-_The_U.S._Army_-_Jump_over_Mt._Rainier.jpg",
+      "thumb_url_1024": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Flickr_-_The_U.S._Army_-_Jump_over_Mt._Rainier.jpg/1280px-Flickr_-_The_U.S._Army_-_Jump_over_Mt._Rainier.jpg",
+      "width": 1852,
+      "height": 1422
+    }
+  ]
+}

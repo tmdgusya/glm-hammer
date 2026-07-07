@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>pptxx spike sample deck</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0e0b08; font-family: Georgia, 'Times New Roman', serif; }
+  .slide {
+    width: 1280px;
+    height: 720px;
+    background: #1a1410;
+    color: #efe7d6;
+    position: relative;
+    overflow: hidden;
+    padding: 64px 80px;
+    border-bottom: 2px solid #0e0b08;
+  }
+  .slide h1 {
+    font-size: 52px;
+    font-weight: 700;
+    color: #efe7d6;
+    letter-spacing: 0.01em;
+    margin-bottom: 20px;
+  }
+  .slide h1 .accent { color: #d97b30; }
+  .slide p.body {
+    font-size: 26px;
+    line-height: 1.5;
+    color: #cbbfa8;
+    max-width: 640px;
+  }
+  .rule {
+    width: 96px; height: 4px; background: #d97b30;
+    margin: 0 0 28px 0;
+  }
+  .nonce {
+    position: absolute;
+    left: 80px;
+    bottom: 64px;
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 44px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: #efe7d6;
+    background: #000000;
+    border: 3px solid #d97b30;
+    padding: 14px 26px;
+  }
+  .shape {
+    position: absolute;
+    right: 80px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .slide-no {
+    position: absolute;
+    right: 80px;
+    bottom: 64px;
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 24px;
+    color: #8a7c63;
+  }
+</style>
+</head>
+<body>
+
+<section class="slide" id="slide-01">
+  <div class="rule"></div>
+  <h1>Slide One <span class="accent">&mdash; Circle</span></h1>
+  <p class="body">Playwright element-capture spike. This slide carries a circle glyph and a sentinel code rendered at high contrast.</p>
+  <svg class="shape" width="320" height="320" viewBox="0 0 320 320" role="img" aria-label="circle">
+    <circle cx="160" cy="160" r="130" fill="none" stroke="#d97b30" stroke-width="14"/>
+    <circle cx="160" cy="160" r="64" fill="#d97b30"/>
+  </svg>
+  <div class="nonce">5SCNR3</div>
+  <div class="slide-no">01 / 03</div>
+</section>
+
+<section class="slide" id="slide-02">
+  <div class="rule"></div>
+  <h1>Slide Two <span class="accent">&mdash; Triangle</span></h1>
+  <p class="body">Second slide of the sample deck. Its unique glyph is a triangle, so a mis-addressed capture is immediately visible.</p>
+  <svg class="shape" width="320" height="320" viewBox="0 0 320 320" role="img" aria-label="triangle">
+    <polygon points="160,20 300,290 20,290" fill="none" stroke="#d97b30" stroke-width="14"/>
+    <polygon points="160,120 235,262 85,262" fill="#d97b30"/>
+  </svg>
+  <div class="nonce">SPEG2H</div>
+  <div class="slide-no">02 / 03</div>
+</section>
+
+<section class="slide" id="slide-03">
+  <div class="rule"></div>
+  <h1>Slide Three <span class="accent">&mdash; Hexagon</span></h1>
+  <p class="body">Third and final slide. Its unique glyph is a hexagon. The sentinel below is the only machine-checked ground truth.</p>
+  <svg class="shape" width="320" height="320" viewBox="0 0 320 320" role="img" aria-label="hexagon">
+    <polygon points="160,16 285,88 285,232 160,304 35,232 35,88" fill="none" stroke="#d97b30" stroke-width="14"/>
+    <polygon points="160,96 220,131 220,201 160,236 100,201 100,131" fill="#d97b30"/>
+  </svg>
+  <div class="nonce">KDU39D</div>
+  <div class="slide-no">03 / 03</div>
+</section>
+
+</body>
+</html>

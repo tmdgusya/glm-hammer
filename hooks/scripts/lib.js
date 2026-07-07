@@ -75,7 +75,7 @@ function sha256File(filePath) {
 
 function planKey(p) {
   const n = String(p).replace(/\\/g, '/');
-  const m = n.match(/docs\/glm-hammer\/(?:plans\/[^/]+\.md|design\/[^/]+\/[^/]+\.(?:md|json))$/i);
+  const m = n.match(/docs\/glm-hammer\/(?:plans\/[^/]+\.md|design\/[^/]+\/[^/]+\.(?:md|json)|decks\/[^/]+\/[^/]+\.(?:md|html))$/i);
   return (m ? m[0] : n).toLowerCase();
 }
 

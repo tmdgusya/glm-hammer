@@ -54,11 +54,13 @@ try {
   }
 
   const workRequest =
-    /(만들|추가|구현|개발|리팩터|리팩토링|수정|고쳐|바꿔|기능|시스템|설계|디자인|계획|플랜|만들어|붙여|개선|마이그레이션|build|implement|add|create|refactor|feature|fix|migrate|redesign|design|develop|integrate|rewrite|plan)/i;
+    /(만들|추가|구현|개발|리팩터|리팩토링|수정|고쳐|바꿔|기능|시스템|설계|디자인|계획|플랜|만들어|붙여|개선|마이그레이션|뽑|생성|추출|export|build|implement|add|create|refactor|feature|fix|migrate|redesign|design|develop|integrate|rewrite|plan)/i;
   if (!workRequest.test(prompt)) process.exit(0);
 
   const executeIntent =
     /(플랜.*(실행|구현|시작)|계획.*(실행|구현|시작)|(실행|구현|시작).*(플랜|계획)|execute the plan|run the plan|implement the plan|proceed with the plan|start implementing)/i;
+  const deckIntent =
+    /(발표|슬라이드|프레젠테이션|deck|presentation|pptx)/i;
   const designIntent =
     /(디자인|무드|룩\s*앤\s*필|브랜딩|비주얼|스타일\s*가이드|디자인\s*토큰|리디자인|design\s*tokens?|style\s*guide|visual\s*identity|look\s*and\s*feel|branding|mood)/i;
   const strongMarker =
@@ -76,6 +78,11 @@ try {
   let hint;
   if (executeIntent.test(prompt) && plansDirHasFiles) {
     hint = 'This looks like a request to execute an existing plan → invoke the `hammer` skill.';
+  } else if (deckIntent.test(prompt)) {
+    hint =
+      'This looks like a presentation/slide-deck request → invoke the `pptxx` skill ' +
+      '(script → crucible design-token chaining → token-styled self-contained HTML deck) ' +
+      'before any ad-hoc slide writing.';
   } else if (designIntent.test(prompt)) {
     hint =
       'This looks like a storyline/reference-driven design request → invoke the `crucible` skill ' +
