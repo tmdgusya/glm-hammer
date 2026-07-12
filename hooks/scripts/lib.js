@@ -98,11 +98,15 @@ function writeSeal(cwd, filePath) {
     const seals = readSeals(cwd);
     const key = planKey(filePath);
     const previous = seals[key];
+    const relative = path.relative(cwd || process.cwd(), filePath).replace(/\\/g, '/');
+    const corePlan = /(^|\/)docs\/glm-hammer\/plans\/[^/]+\.md$/i.test(relative);
+    const syntax = parseStrictPlan(bytes.toString('utf8'), null, { syntaxOnly: true });
+    if (corePlan && !syntax.ok) return false;
     const entry = {
       sha256: hash,
+      planSha256: hash,
       generation: previous && previous.sha256 === hash ? previous.generation || 0 : (previous && previous.generation || 0) + 1,
     };
-    const syntax = parseStrictPlan(bytes.toString('utf8'), null, { syntaxOnly: true });
     if (syntax.ok) {
       const captured = capturePlanPathBaseline(path.resolve(cwd || process.cwd()), syntax.declaredPaths);
       if (!captured.ok) return false;
@@ -126,6 +130,24 @@ function sealMatches(cwd, filePath) {
   if (!seal) return 'missing';
   const cur = sha256File(filePath);
   if (!cur) return 'missing';
+  const relative = path.relative(cwd || process.cwd(), filePath).replace(/\\/g, '/');
+  const corePlan = /(^|\/)docs\/glm-hammer\/plans\/[^/]+\.md$/i.test(relative);
+  if (corePlan) {
+    let syntax;
+    try {
+      syntax = parseStrictPlan(fs.readFileSync(filePath, 'utf8'), null, { syntaxOnly: true });
+    } catch {
+      return 'broken';
+    }
+    if (!syntax.ok || !HASH_RE.test(seal.planSha256 || '') ||
+        seal.planSha256 !== seal.sha256 || seal.planSha256 !== cur ||
+        !HASH_RE.test(seal.planPathBaselineSha256 || '') ||
+        !seal.planPathBaseline ||
+        !validatePlanPathBaseline(seal.planPathBaseline, syntax.declaredPaths).ok ||
+        seal.planPathBaselineSha256 !== sha256(canonicalJson(seal.planPathBaseline))) {
+      return 'missing';
+    }
+  }
   return seal.sha256 === cur ? 'ok' : 'broken';
 }
 
@@ -253,6 +275,67 @@ function exactKeys(value, keys) {
 function result(code, value) {
   return code ? { ok: false, code } : { ok: true, value };
 }
+function validateJournalPayload(type, payload, event, options) {
+  if (type === 'ROUTER_ARMED') {
+    if ((payload.baselineHead !== null && !/^[0-9a-f]{40,64}$/.test(payload.baselineHead || '')) ||
+        !HASH_RE.test(payload.baselineSnapshotSha256 || '') || !HASH_RE.test(payload.promptEventHash || '')) return 'EVT_SEMANTIC';
+  } else if (type === 'PHASE_TRANSITIONED') {
+    const phases = new Set(['idle', 'forge', 'crucible', 'hammer', 'pptxx']);
+    const statuses = {
+      idle: new Set(['idle', 'done']),
+      forge: new Set(['recon', 'drafting', 'critique', 'approved', 'awaiting-user']),
+      crucible: new Set(['prospecting', 'smelting', 'assay', 'critique', 'approved', 'awaiting-user']),
+      hammer: new Set(['executing', 'review', 'awaiting-user', 'done']),
+      pptxx: new Set(['scripting', 'chaining', 'imaging', 'building', 'visual-qa', 'exporting', 'awaiting-user', 'done']),
+    };
+    const optionalPhase = (value) => value === null || (typeof value === 'string' && phases.has(value));
+    const edges = new Set(['idle>forge', 'idle>crucible', 'idle>hammer', 'idle>pptxx', 'forge>hammer', 'crucible>pptxx', 'hammer>idle', 'pptxx>idle']);
+    if (![payload.fromPhase, payload.toPhase].every((value) => typeof value === 'string' && phases.has(value)) ||
+        !optionalPhase(payload.parentPhase) || !optionalPhase(payload.resumePhase) ||
+        typeof payload.fromStatus !== 'string' || typeof payload.toStatus !== 'string' ||
+        !statuses[payload.fromPhase].has(payload.fromStatus) || !statuses[payload.toPhase].has(payload.toStatus) ||
+        (payload.fromPhase !== payload.toPhase && !edges.has(`${payload.fromPhase}>${payload.toPhase}`))) return 'EVT_TRANSITION';
+    if (payload.fromPhase === 'idle' && payload.toPhase === 'idle') return 'EVT_TRANSITION';
+  } else if (type === 'PLAN_GENERATION_ADVANCED') {
+    if (!normalizeRepoPath(payload.planPath) || !HASH_RE.test(payload.planPathBaselineSha256 || '') ||
+        !HASH_RE.test(payload.planSha256 || '') || !Number.isSafeInteger(payload.previousGeneration) ||
+        payload.previousGeneration < 0 || event.generation !== payload.previousGeneration + 1) return 'EVT_SEMANTIC';
+  } else if (type === 'PLAN_PATH_BASELINE_RECORDED') {
+    const paths = Object.keys(payload.planPathBaseline || {});
+    if (!HASH_RE.test(payload.planPathBaselineSha256 || '') || !HASH_RE.test(payload.planSha256 || '') ||
+        !validatePlanPathBaseline(payload.planPathBaseline, paths).ok ||
+        payload.planPathBaselineSha256 !== sha256(canonicalJson(payload.planPathBaseline))) return 'EVT_SEMANTIC';
+  } else if (type === 'USER_QUESTION_OBSERVED') {
+    if (!HASH_RE.test(payload.observerEventHash || '') || typeof payload.observerKind !== 'string' ||
+        !payload.observerKind || typeof payload.turnId !== 'string' || !payload.turnId) return 'EVT_SEMANTIC';
+  } else if (type === 'RUN_ENDED_UNVERIFIED') {
+    if (!Number.isSafeInteger(payload.endedAtMs) || payload.endedAtMs < event.atMs ||
+        !HASH_RE.test(payload.questionProofEventHash || '') || !EVENT_ID_RE.test(payload.questionProofEventId || '') ||
+        !Array.isArray(payload.unresolvedGateCodes) || payload.unresolvedGateCodes.some((code) => typeof code !== 'string') ||
+        !HASH_RE.test(payload.userPromptEventHash || '')) return 'EVT_SEMANTIC';
+  } else if (type === 'CORE_DISPATCH_COMPLETED') {
+    const role = RECEIPT_ROLES[payload.role];
+    const review = role && role.review;
+    const tail = String(payload.evidencePath || '').replace(/^\.glm-hammer\/evidence\//, '');
+    const now = options && options.nowMs == null ? Date.now() : (options && options.nowMs);
+    for (const key of ['invocationMs', 'completionMs', 'observedAtMs', 'receiptMtimeMs']) {
+      if (!Number.isSafeInteger(payload[key])) return 'EVT_SEMANTIC';
+    }
+    if (!role || !role.path.test(tail) || !UUID_RE.test(payload.dispatchId || '') ||
+        payload.invocationMs > now || payload.completionMs > now || payload.observedAtMs > now ||
+        payload.invocationMs > payload.completionMs || payload.completionMs > payload.observedAtMs ||
+        payload.receiptMtimeMs < payload.invocationMs - 2000 || payload.receiptMtimeMs > payload.observedAtMs + 2000 ||
+        !HASH_RE.test(payload.receiptSha256 || '') || !HASH_RE.test(payload.toolEventHash || '') ||
+        !Number.isSafeInteger(payload.receiptSize) || payload.receiptSize < 0 ||
+        (review ? !HASH_RE.test(payload.sourceSnapshotSha256 || '') : payload.sourceSnapshotSha256 !== null)) return 'EVT_SEMANTIC';
+  } else if (type === 'SOURCE_BASELINE_RECORDED' || type === 'SOURCE_REVIEW_SNAPSHOT_RECORDED') {
+    if ((payload.head !== null && !/^[0-9a-f]{40,64}$/.test(payload.head || '')) ||
+        typeof payload.scope !== 'string' || !payload.scope || !HASH_RE.test(payload.snapshotSha256 || '')) return 'EVT_SEMANTIC';
+  } else if (type === 'RUN_COMPLETED') {
+    if (!HASH_RE.test(payload.planSha256 || '') || !HASH_RE.test(payload.reviewSnapshotSha256 || '')) return 'EVT_SEMANTIC';
+  }
+  return null;
+}
 
 function validateJournalEvent(event, options = {}) {
   if (!exactKeys(event, ['schemaVersion', 'type', 'eventId', 'runId', 'seq', 'generation', 'atMs', 'payload'])) {
@@ -269,6 +352,8 @@ function validateJournalEvent(event, options = {}) {
   const nowMs = options.nowMs == null ? Date.now() : options.nowMs;
   if (!Number.isSafeInteger(event.atMs) || event.atMs > nowMs) return result('EVT_TIME');
   if (!exactKeys(event.payload, EVENT_TYPES[event.type])) return result('EVT_PAYLOAD');
+  const semantic = validateJournalPayload(event.type, event.payload, event, options);
+  if (semantic) return result(semantic);
   return result(null, event);
 }
 
@@ -381,12 +466,37 @@ function releaseJournalLock(lock) {
     return false;
   }
 }
+const MAX_JOURNAL_BYTES = 512 * 1024;
+
+function rotateCompletedJournal(cwd, journal, nextType, nextRunId) {
+  const terminal = journal.events[journal.events.length - 1];
+  if (!terminal || !['RUN_COMPLETED', 'RUN_ENDED_UNVERIFIED'].includes(terminal.type) ||
+      terminal.runId === nextRunId || !['ROUTER_ARMED', 'LEGACY_RUN_MIGRATED'].includes(nextType)) return journal;
+  const file = journalPath(cwd);
+  let bytes;
+  try {
+    bytes = fs.readFileSync(file);
+  } catch {
+    return journal;
+  }
+  if (bytes.length <= MAX_JOURNAL_BYTES) return journal;
+  const archive = `${file}.archive-${sha256(bytes).slice(0, 16)}.jsonl`;
+  if (fs.existsSync(archive)) {
+    if (!fs.readFileSync(archive).equals(bytes)) return { ok: false, code: 'JOURNAL_ROTATION_COLLISION' };
+    fs.rmSync(file);
+  } else {
+    fs.renameSync(file, archive);
+  }
+  return { ok: true, events: [], tornTail: null, rotatedTo: archive };
+}
 
 function appendJournalEvent(cwd, event, options = {}) {
   const lock = acquireJournalLock(cwd, options);
   if (!lock.ok) return lock;
   try {
-    const journal = readJournal(cwd, { nowMs: options.nowMs });
+    let journal = readJournal(cwd, { nowMs: options.nowMs });
+    if (!journal.ok) return journal;
+    journal = rotateCompletedJournal(cwd, journal, event.type, event.runId);
     if (!journal.ok) return journal;
     const file = journalPath(cwd);
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -418,7 +528,9 @@ function appendJournalPayload(cwd, type, runId, generation, payload, options = {
   const lock = acquireJournalLock(cwd, options);
   if (!lock.ok) return lock;
   try {
-    const journal = readJournal(cwd, { nowMs: options.nowMs });
+    let journal = readJournal(cwd, { nowMs: options.nowMs });
+    if (!journal.ok) return journal;
+    journal = rotateCompletedJournal(cwd, journal, type, runId);
     if (!journal.ok) return journal;
     const file = journalPath(cwd);
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -508,20 +620,27 @@ function parseStrictPlan(text, baseline, options = {}) {
     if (section === 'files' && file) {
       const normalized = normalizeRepoPath(file[2]);
       if (!normalized) return result('PLAN_FILE');
+      if (task.files.some((existing) => existing.path === normalized)) {
+        return result('PLAN_FILE_DUPLICATE');
+      }
       task.files.push({ operation: file[1], path: normalized });
       continue;
     }
     if (section === 'files' && /^- /.test(line)) return result('PLAN_FILE');
     if (section === 'acceptance' && /^- \[ \] /.test(line)) {
-      task.acceptance.push(line.slice(6));
+      const obligation = line.slice(6).trim();
+      if (!obligation) return result('PLAN_ACCEPTANCE');
+      task.acceptance.push(obligation);
       continue;
     }
     if (section === 'acceptance' && /^- \[[xX]\] /.test(line)) return result('PLAN_ACCEPTANCE');
-    const step = line.match(/^\*\*Step ([1-9]\d*):\*\* /);
+    const step = line.match(/^\*\*Step ([1-9]\d*):\*\*\s+(\S.*)$/);
     if (step) {
       task.steps.push(Number(step[1]));
       section = 'steps';
+      continue;
     }
+    if (/^\*\*Step /.test(line)) return result('PLAN_STEPS');
   }
   if (fenced || tasks.length === 0) return result('PLAN_TASKS');
   for (let i = 0; i < tasks.length; i++) {
@@ -535,7 +654,9 @@ function parseStrictPlan(text, baseline, options = {}) {
     if (!current.acceptance.length) return result('PLAN_ACCEPTANCE');
     if (!current.steps.length || current.steps.some((step, index) => step !== index + 1)) return result('PLAN_STEPS');
   }
-  const declaredPaths = [...new Set(tasks.flatMap((entry) => entry.files.map((file) => file.path)))].sort();
+  const declaredPaths = [];
+  for (const entry of tasks) for (const file of entry.files) if (!declaredPaths.includes(file.path)) declaredPaths.push(file.path);
+  declaredPaths.sort();
   if (options.syntaxOnly) return { ok: true, tasks, declaredPaths };
   const baselineCheck = validatePlanPathBaseline(baseline, declaredPaths);
   if (!baselineCheck.ok) return baselineCheck;
@@ -863,30 +984,61 @@ function validateSourceSnapshot(snapshot) {
   return result(null, snapshot);
 }
 
+function quarantineUnchanged(cwd, source) {
+  if (!source || !fs.existsSync(source) || !fs.statSync(source).isFile()) return null;
+  const quarantine = path.join(cwd, '.glm-hammer', 'quarantine');
+  fs.mkdirSync(quarantine, { recursive: true });
+  const target = path.join(quarantine, `${path.basename(source)}.${Date.now()}.unchanged`);
+  fs.copyFileSync(source, target);
+  return target;
+}
+
 function migrateLegacyCoreRun(cwd, options = {}) {
   const stateFile = statePath(cwd);
   const sealFile = sealPath(cwd);
   let stateBytes;
-  let sealBytes;
-  let source = stateFile;
+  let state;
   try {
     stateBytes = fs.readFileSync(stateFile);
-    JSON.parse(stateBytes);
-    source = sealFile;
-    sealBytes = fs.readFileSync(sealFile);
-    JSON.parse(sealBytes);
+    state = JSON.parse(stateBytes);
+    if (!state || typeof state !== 'object' || Array.isArray(state)) throw new Error('state shape');
   } catch (error) {
-    if (fs.existsSync(source)) {
-      const quarantine = path.join(cwd, '.glm-hammer', 'quarantine');
-      fs.mkdirSync(quarantine, { recursive: true });
-      fs.copyFileSync(source, path.join(quarantine, `${path.basename(source)}.${Date.now()}.unchanged`));
-    }
-    return result(error.code === 'EACCES' ? 'MIGRATION_UNREADABLE' : 'MIGRATION_CORRUPT');
+    quarantineUnchanged(cwd, stateFile);
+    return result(['EACCES', 'EPERM', 'EISDIR'].includes(error.code) ? 'MIGRATION_UNREADABLE' : 'MIGRATION_CORRUPT');
   }
-  const state = JSON.parse(stateBytes);
-  if (state.runId && UUID_RE.test(state.runId) && readJournal(cwd).events.length) return { ok: true, migrated: false };
+  const journal = readJournal(cwd);
+  if (!journal.ok || journal.tornTail) {
+    quarantineUnchanged(cwd, journalPath(cwd));
+    return result(journal.code === 'JOURNAL_READ' ? 'MIGRATION_UNREADABLE' : 'MIGRATION_CORRUPT');
+  }
+  if (state.schemaVersion === 1 && state.runId && UUID_RE.test(state.runId) &&
+      Number.isSafeInteger(state.generation) && journal.events.some((event) =>
+        event.runId === state.runId && event.generation === state.generation &&
+        event.type === 'ROUTER_ARMED')) return { ok: true, migrated: false };
+  let sealBytes;
+  let seals;
+  try {
+    sealBytes = fs.readFileSync(sealFile);
+    seals = JSON.parse(sealBytes);
+    if (!seals || typeof seals !== 'object' || Array.isArray(seals)) throw new Error('seal shape');
+  } catch (error) {
+    quarantineUnchanged(cwd, sealFile);
+    return result(['EACCES', 'EPERM', 'EISDIR'].includes(error.code) ? 'MIGRATION_UNREADABLE' : 'MIGRATION_CORRUPT');
+  }
+  const planRelative = typeof state.plan === 'string' ? state.plan : '';
+  const planAbsolute = planRelative && path.resolve(cwd, planRelative);
+  const sealed = seals[planKey(planRelative)] || seals[planRelative.toLowerCase()];
+  const planSha256 = planAbsolute && sha256File(planAbsolute);
+  if (!planRelative || path.isAbsolute(planRelative) ||
+      (planAbsolute !== cwd && !planAbsolute.startsWith(path.resolve(cwd) + path.sep)) ||
+      !planSha256 || !sealed || sealed.sha256 !== planSha256) {
+    quarantineUnchanged(cwd, planAbsolute);
+    quarantineUnchanged(cwd, sealFile);
+    return result('MIGRATION_PLAN_INVALID');
+  }
   const runId = options.runId || crypto.randomUUID();
   const now = Date.now();
+  // The legacy seal was validated above; migration records the exact current bytes.
   const event = {
     schemaVersion: 1,
     type: 'LEGACY_RUN_MIGRATED',
@@ -898,17 +1050,23 @@ function migrateLegacyCoreRun(cwd, options = {}) {
     payload: {
       legacyStateSha256: sha256(stateBytes),
       migrationCode: 'FRESH_REDISPATCH_REQUIRED',
-      planPath: state.plan || '',
-      planSha256: state.plan && sha256File(path.resolve(cwd, state.plan)) || '0'.repeat(64),
+      planPath: planRelative,
+      planSha256,
     },
   };
   const appended = appendJournalEvent(cwd, event);
   if (!appended.ok) return appended;
   writeState(cwd, {
+    schemaVersion: 1,
     phase: state.phase || 'forge',
     status: 'migration-required',
     runId,
     generation: 0,
+    generationStartMs: now,
+    plan: planRelative,
+    planSha256,
+    baselineHead: state.baselineHead || null,
+    declaredPaths: [],
     verification: 'UNVERIFIED',
   });
   return { ok: true, migrated: true, event };

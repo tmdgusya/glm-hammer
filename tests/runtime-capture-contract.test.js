@@ -15,14 +15,20 @@ function check(name, condition, detail) {
 }
 function directory(name) { const p = path.join(tmp, name); fs.mkdirSync(p); return p; }
 const artifact = path.join(tmp, 'zcode');
-fs.writeFileSync(artifact, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+fs.writeFileSync(artifact, `#!/bin/sh
+if [ "$1" = "doctor" ] && [ "$2" = "--json" ]; then
+  printf '%s\n' '{"cli":{"name":"zcode","processName":"zcode-cli","version":"0.15.2"}}'
+  exit 0
+fi
+exit 64
+`, { mode: 0o755 });
 const digest = crypto.createHash('sha256').update(fs.readFileSync(artifact)).digest('hex');
 const base = {
   ...process.env,
   ZCODE_BIN: artifact,
   ZCODE_ENGINE_ARTIFACT: artifact,
-  GLM_HAMMER_ENGINE_NAME: 'zcode',
-  GLM_HAMMER_ENGINE_VERSION: '3.2.x',
+  GLM_HAMMER_ENGINE_NAME: 'zcode-cli',
+  GLM_HAMMER_ENGINE_VERSION: '0.15.2',
   GLM_HAMMER_ENGINE_SHA256: digest,
 };
 function validate(capture, overrides = {}) {

@@ -1,0 +1,6 @@
+{
+  "phase": "hammer",
+  "status": "review",
+  "plan": "tests/fixtures/migration/corrupt-journal/plan.md",
+  "tasks": { "total": 1, "completed": 0 }
+}

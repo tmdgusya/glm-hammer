@@ -1,0 +1,5 @@
+{
+  "tests/fixtures/migration/corrupt-seal/plan.md": {
+    "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  }
+}

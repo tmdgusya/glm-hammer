@@ -1,0 +1,7 @@
+{
+  "phase": "forge",
+  "status": "approved",
+  "plan": "tests/fixtures/migration/corrupt-plan/plan.md",
+  "tasks": { "total": 2, "completed": 2 },
+  "reviews": { "security": "pass" }
+}

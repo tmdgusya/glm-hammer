@@ -5,13 +5,121 @@
 //   picks forge / blueprint / hammer without the user naming a skill.
 const fs = require('fs');
 const path = require('path');
-const { readStdin, readState, writeState, emitContext, readJournal, canonicalJson, sha256, atomicUnverified } = require('./lib');
+const crypto = require('crypto');
+const {
+  readStdin, readState, writeState, emitContext, readJournal, canonicalJson, sha256, atomicUnverified,
+  appendJournalPayload, buildSourceSnapshot, parseStrictPlan, capturePlanPathBaseline,
+} = require('./lib');
+function armCoreRequest(cwd, state, prompt) {
+  if (!state || state.schemaVersion !== 1 || !state.runId || !Number.isSafeInteger(state.generation)) return false;
+  const snapshot = buildSourceSnapshot(cwd, {
+    baselineHead: state.baselineHead || null,
+    declaredPaths: state.declaredPaths || [],
+  });
+  if (!snapshot.ok) return false;
+  const journal = readJournal(cwd);
+  if (!journal.ok || !journal.events.some((event) =>
+    event.runId === state.runId && event.generation === state.generation &&
+    event.type === 'ROUTER_ARMED')) return false;
+  const armed = appendJournalPayload(cwd, 'ROUTER_ARMED', state.runId, state.generation, {
+    baselineHead: snapshot.snapshot.baselineHead,
+    baselineSnapshotSha256: snapshot.sha256,
+    promptEventHash: sha256(Buffer.from(prompt)),
+  });
+  return armed.ok;
+}
+function bootstrapCoreRun(cwd, phase, status, prompt) {
+  const runId = crypto.randomUUID();
+  const generation = 0;
+  const startedAtMs = Date.now();
+  let planControl = null;
+  if (phase === 'hammer') {
+    const plansDir = path.join(cwd, 'docs', 'glm-hammer', 'plans');
+    let candidates = [];
+    try {
+      candidates = fs.readdirSync(plansDir)
+        .filter((name) => name.endsWith('.md'))
+        .map((name) => path.join(plansDir, name))
+        .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+    } catch {
+      return null;
+    }
+    for (const absolute of candidates) {
+      const text = fs.readFileSync(absolute, 'utf8');
+      const syntax = parseStrictPlan(text, null, { syntaxOnly: true });
+      if (!syntax.ok) continue;
+      const baseline = capturePlanPathBaseline(cwd, syntax.declaredPaths);
+      if (!baseline.ok) continue;
+      planControl = {
+        path: path.relative(cwd, absolute).replace(/\\/g, '/'),
+        sha256: sha256(Buffer.from(text)),
+        declaredPaths: syntax.declaredPaths,
+        baseline: baseline.baseline,
+        baselineSha256: baseline.sha256,
+      };
+      break;
+    }
+    if (!planControl) return null;
+  }
+  const snapshot = buildSourceSnapshot(cwd, {
+    baselineHead: null,
+    declaredPaths: planControl ? planControl.declaredPaths : [],
+  });
+  if (!snapshot.ok) return null;
+  const state = {
+    schemaVersion: 1,
+    phase,
+    status,
+    runId,
+    generation,
+    generationStartMs: startedAtMs,
+    baselineHead: snapshot.snapshot.currentHead,
+    declaredPaths: planControl ? planControl.declaredPaths : [],
+    plan: planControl ? planControl.path : undefined,
+    planSha256: planControl ? planControl.sha256 : undefined,
+    stopBlocks: 0,
+  };
+  writeState(cwd, state);
+  const armed = appendJournalPayload(cwd, 'ROUTER_ARMED', runId, generation, {
+    baselineHead: snapshot.snapshot.baselineHead,
+    baselineSnapshotSha256: snapshot.sha256,
+    promptEventHash: sha256(Buffer.from(prompt)),
+  }, { atMs: startedAtMs });
+  const transitioned = armed.ok && appendJournalPayload(cwd, 'PHASE_TRANSITIONED', runId, generation, {
+    fromPhase: 'idle',
+    fromStatus: 'idle',
+    parentPhase: null,
+    resumePhase: null,
+    toPhase: phase,
+    toStatus: status,
+  }, { atMs: startedAtMs });
+  const sealed = transitioned && transitioned.ok && (!planControl || appendJournalPayload(
+    cwd, 'PLAN_PATH_BASELINE_RECORDED', runId, generation, {
+      planPathBaseline: planControl.baseline,
+      planPathBaselineSha256: planControl.baselineSha256,
+      planSha256: planControl.sha256,
+    }, { atMs: startedAtMs }));
+  if (!sealed || (sealed !== true && !sealed.ok)) return null;
+  return state;
+}
 
 try {
   const input = readStdin();
   const cwd = input.cwd || process.cwd();
   const prompt = String(input.prompt || '');
-  const state = readState(cwd);
+  let state = readState(cwd);
+  const stateJournal = state && state.schemaVersion === 1 && state.runId ? readJournal(cwd) : null;
+  const armedRun = Boolean(stateJournal && stateJournal.ok && stateJournal.events.some((event) =>
+    event.type === 'ROUTER_ARMED' && event.runId === state.runId &&
+    event.generation === state.generation));
+  const completedRun = Boolean(armedRun && stateJournal.events.some((event) =>
+    event.type === 'RUN_COMPLETED' && event.runId === state.runId &&
+    event.generation === state.generation));
+  const authenticatedCore = Boolean(state && state.schemaVersion === 1 && state.runId &&
+    Number.isSafeInteger(state.generation));
+  const bootstrapEligible = !state || (authenticatedCore
+    ? completedRun
+    : (!state.phase || state.phase === 'idle' || state.status === 'done'));
   if (state && state.schemaVersion === 1 && state.runId && Number.isSafeInteger(state.generation) &&
       /^glm-hammer override-unverified /.test(prompt.trim())) {
     const journal = readJournal(cwd);
@@ -30,14 +138,14 @@ try {
     process.exit(0);
   }
 
-  const active =
-    state &&
-    state.phase &&
-    state.phase !== 'idle' &&
-    state.status &&
-    state.status !== 'done';
+  const workRequest =
+    /(만들|추가|구현|개발|리팩터|리팩토링|수정|고쳐|바꿔|기능|시스템|설계|디자인|계획|플랜|만들어|붙여|개선|마이그레이션|뽑|생성|추출|export|build|implement|add|create|refactor|feature|fix|migrate|redesign|design|develop|integrate|rewrite|plan)/i;
+  const active = authenticatedCore
+    ? !completedRun
+    : Boolean(state && state.phase && state.phase !== 'idle' && state.status && state.status !== 'done');
 
   if (active) {
+    if (workRequest.test(prompt)) armCoreRequest(cwd, state, prompt);
     // Fresh user turn: reset the stop-block counter so the gate can enforce again.
     state.stopBlocks = 0;
     writeState(cwd, state);
@@ -70,8 +178,6 @@ try {
     process.exit(0);
   }
 
-  const workRequest =
-    /(만들|추가|구현|개발|리팩터|리팩토링|수정|고쳐|바꿔|기능|시스템|설계|디자인|계획|플랜|만들어|붙여|개선|마이그레이션|뽑|생성|추출|export|build|implement|add|create|refactor|feature|fix|migrate|redesign|design|develop|integrate|rewrite|plan)/i;
   if (!workRequest.test(prompt)) process.exit(0);
 
   const executeIntent =
@@ -113,6 +219,12 @@ try {
       'small clear change (≤3 files, existing interfaces) → `blueprint` skill; ' +
       'an approved plan already exists and the user wants it built → `hammer` skill. ' +
       'Trivial one-liners need no skill.';
+  }
+  if (bootstrapEligible &&
+      ((executeIntent.test(prompt) && plansDirHasFiles) || strongMarker.test(prompt))) {
+    const phase = executeIntent.test(prompt) && plansDirHasFiles ? 'hammer' : 'forge';
+    state = bootstrapCoreRun(cwd, phase, phase === 'hammer' ? 'executing' : 'recon', prompt);
+    if (!state) process.exit(0);
   }
 
   emitContext(

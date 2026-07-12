@@ -85,7 +85,7 @@ hooks는 서브에이전트를 직접 띄울 수 없으므로, 스킬이 `.glm-h
 
 ### ZCode 호환성 (엔진 실증 기준)
 
-ZCode 설치본(`zcode.cjs` v3.2.x)과 내장 `diagnosing-hooks` 가이드로 직접 검증한 내용:
+정확한 `zcode-cli` 0.15.2 엔진 아티팩트(`/opt/ZCode/resources/glm/zcode.cjs`, SHA-256 `0f2ab95e39876fd639a15eb207fd42ca692d145f44ae5093714071a07de9c16e`)와 내장 `diagnosing-hooks` 가이드로 검증했다. 환경별 승인 및 캡처 수정 기록은 `docs/glm-hammer/plans/2026-07-12-harness-hardening-runtime-amendment.md`에 있다:
 
 - 지원 이벤트는 **정확히 7개**: SessionStart, UserPromptSubmit, PreToolUse, PermissionRequest, PostToolUse, PostToolUseFailure, Stop. **SubagentStop/PreCompact/Notification 미지원** → 이 플러그인은 Stop 게이트만 사용
 - `${ZCODE_PLUGIN_ROOT}` 치환, `statusMessage`, matcher(대소문자 구분 정규식) 지원. `Write`/`Edit` ← `ApplyPatch` 별칭 자동 매핑

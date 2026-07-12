@@ -13,11 +13,15 @@
   },
   "fsKind": "local",
   "localSingleHost": true,
-  "testScriptSha256": "b0e6c43306c80c9ecfabcbe77bc168632290c38e402ab0674d8edf9078d2d6c8",
+  "testScriptSha256": "4bb1eba40f9f39995f578e0cb83ecdadd4dafb2ee4c42701baeead083d013c93",
   "capabilitiesSha256": "b5c9a69fb328ba5657e5b6a5650fa7769456a55ac0b51f3016473dfbd17f8bab",
   "journalSchemaVersion": 1,
-  "startedAtMs": 1783835128653,
-  "finishedAtMs": 1783835128817,
+  "startedAtMs": 1783843022138,
+  "finishedAtMs": 1783843022424,
+  "journalEvidence": {
+    "liveJournalSha256": "bc055c17e38096bb04dda3d15a08d653e59aed837a450072fd4cbbbbf8d0306b",
+    "rotatedArchiveSha256": "1c3a3dd12c438bbe33dfdf1105388846e0bb10bf1d6f5f61e4f5beb4a2d10e62"
+  },
   "cases": [
     {
       "name": "parallel-append",
@@ -33,6 +37,30 @@
     },
     {
       "name": "owner-token-release",
+      "expectedCount": 1,
+      "actualCount": 1,
+      "verdict": "PASS"
+    },
+    {
+      "name": "stale-owner-lock-reclamation",
+      "expectedCount": 2,
+      "actualCount": 2,
+      "verdict": "PASS"
+    },
+    {
+      "name": "mid-file-corruption-blocking",
+      "expectedCount": 1,
+      "actualCount": 1,
+      "verdict": "PASS"
+    },
+    {
+      "name": "legal-transition-semantics",
+      "expectedCount": 1,
+      "actualCount": 1,
+      "verdict": "PASS"
+    },
+    {
+      "name": "completed-journal-rotation",
       "expectedCount": 1,
       "actualCount": 1,
       "verdict": "PASS"

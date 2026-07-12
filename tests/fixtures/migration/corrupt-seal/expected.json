@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "code": "MIGRATION_CORRUPT",
+  "code": "MIGRATION_PLAN_INVALID",
   "journalEvents": 0,
   "quarantinePreservesBytes": true,
-  "quarantine": "state.json"
+  "quarantine": "plan-seal.json"
 }

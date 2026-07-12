@@ -1,0 +1,5 @@
+{
+  "operation": "read-state",
+  "simulatedNodeCode": "EISDIR",
+  "reason": "Portable fixture uses a directory at state.json to exercise the unreadable-state branch."
+}

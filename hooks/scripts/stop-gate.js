@@ -27,6 +27,14 @@ const {
   sealMatches,
   sha256File,
   readDispatchedTails,
+  readJournal,
+  appendJournalPayload,
+  parseStrictPlan,
+  parseReceiptV1,
+  validateCoreDispatch,
+  buildSourceSnapshot,
+  canonicalJson,
+  sha256,
   emit,
 } = require('./lib');
 
@@ -40,6 +48,8 @@ const PROSPECT_REPORTS = [
   'layout-prospector',
   'motion-prospector',
 ];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const HASH = /^[0-9a-f]{64}$/;
 const CRUCIBLE_PANEL = ['harmony-critic', 'rigor-critic'];
 const APPROVE = /VERDICT:\s*APPROVE/i;
 const PASS = /VERDICT:\s*PASS/i;
@@ -430,21 +440,239 @@ function pptxxGate(cwd, state) {
 
   return null;
 }
+function readJsonFile(file) {
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function phase0Problem(cwd) {
+  const localDir = path.join(cwd, 'tests', 'fixtures', 'runtime');
+  const fallbackDir = path.resolve(__dirname, '..', '..', 'tests', 'fixtures', 'runtime');
+  const dir = fs.existsSync(path.join(localDir, 'manifest.json')) ? localDir : fallbackDir;
+  const files = ['manifest.json', 'capabilities.json', 'capability-matrix.json', 'architect-approval-receipt.json', 'approval.json', 'journal-stress-result.json', 'platform-certification.json'];
+  const docs = {};
+  for (const name of files) {
+    docs[name] = readJsonFile(path.join(dir, name));
+    if (!docs[name]) return `Core gate: missing or invalid Phase-0 artifact ${name}.`;
+  }
+  const manifest = docs['manifest.json'];
+  const capabilities = docs['capabilities.json'];
+  const matrix = docs['capability-matrix.json'];
+  const receipt = docs['architect-approval-receipt.json'];
+  const approval = docs['approval.json'];
+  const result = docs['journal-stress-result.json'];
+  const certification = docs['platform-certification.json'];
+  const hashFile = (name) => sha256(fs.readFileSync(path.join(dir, name)));
+  if (manifest.schemaVersion !== 1 || capabilities.schemaVersion !== 1 || matrix.schemaVersion !== 1 ||
+      receipt.schemaVersion !== 1 || approval.schemaVersion !== 1 || result.schemaVersion !== 1 ||
+      certification.schemaVersion !== 1 ||
+      manifest.engineIdentity == null || canonicalJson(capabilities.engineIdentity) !== canonicalJson(manifest.engineIdentity) ||
+      canonicalJson(matrix.engineIdentity) !== canonicalJson(manifest.engineIdentity) ||
+      canonicalJson(receipt.engineIdentity) !== canonicalJson(manifest.engineIdentity) ||
+      canonicalJson(approval.engineIdentity) !== canonicalJson(manifest.engineIdentity) ||
+      canonicalJson(result.engineIdentity) !== canonicalJson(manifest.engineIdentity) ||
+      canonicalJson(certification.engineIdentity) !== canonicalJson(manifest.engineIdentity)) {
+    return 'Core gate: Phase-0 identity or schema validation failed.';
+  }
+  if (approval.architecturalStatus !== 'CLEAR' || approval.recommendation !== 'APPROVE' ||
+      receipt.reviewerRole !== 'architect' || receipt.architecturalStatus !== 'CLEAR' ||
+      receipt.recommendation !== 'APPROVE' ||
+      approval.manifestSha256 !== hashFile('manifest.json') ||
+      approval.capabilitiesSha256 !== hashFile('capabilities.json') ||
+      approval.matrixSha256 !== hashFile('capability-matrix.json') ||
+      receipt.manifestSha256 !== approval.manifestSha256 ||
+      receipt.capabilitiesSha256 !== approval.capabilitiesSha256 ||
+      receipt.matrixSha256 !== approval.matrixSha256 ||
+      approval.receipt?.path !== 'tests/fixtures/runtime/architect-approval-receipt.json' ||
+      approval.receipt?.sha256 !== hashFile('architect-approval-receipt.json')) {
+    return 'Core gate: Phase-0 architectural approval is invalid or stale.';
+  }
+  if (capabilities.questionObserver !== 'stop-transcript' ||
+      capabilities.capabilities?.Stop?.status !== 'supported' ||
+      capabilities.capabilities?.AskUserQuestion?.status !== 'unsupported' ||
+      capabilities.capabilities?.Bash?.status !== 'unsupported' ||
+      matrix.questionObserver !== 'stop-transcript' || matrix.f11 !== 'OPEN') {
+    return 'Core gate: approved runtime capability selection is invalid.';
+  }
+  let testScriptSha256;
+  try { testScriptSha256 = sha256(fs.readFileSync(path.resolve(dir, '..', '..', 'journal-stress.test.js'))); }
+  catch { return 'Core gate: platform certification test source is missing.'; }
+  const expectedResultPath = 'tests/fixtures/runtime/journal-stress-result.json';
+  if (certification.fsKind !== 'local' || certification.localSingleHost !== true ||
+      certification.journalSchemaVersion !== 1 || certification.status !== 'APPROVE' ||
+      certification.result?.path !== expectedResultPath ||
+      certification.result?.sha256 !== hashFile('journal-stress-result.json') ||
+      certification.testScriptSha256 !== testScriptSha256 ||
+      certification.capabilitiesSha256 !== hashFile('capabilities.json') ||
+      result.overall !== 'PASS' || !Array.isArray(result.cases) ||
+      result.cases.some((entry) => entry.verdict !== 'PASS') ||
+      !certification.os || canonicalJson(certification.os) !== canonicalJson(result.os) ||
+      certification.os.platform !== process.platform || certification.os.arch !== process.arch ||
+      certification.os.nodeVersion !== process.version || certification.os.release !== require('os').release()) {
+    return 'Core gate: platform certification is missing, stale, or invalid.';
+  }
+  return null;
+}
+
+function corePlan(cwd, state, events) {
+  if (typeof state.plan !== 'string' || !state.plan || path.isAbsolute(state.plan)) return { error: 'Core gate: sealed plan path is missing or invalid.' };
+  const planFile = path.resolve(cwd, state.plan);
+  if (path.relative(cwd, planFile).startsWith(`..${path.sep}`)) return { error: 'Core gate: sealed plan path escapes the repository.' };
+  const planSha = sha256File(planFile);
+  if (!planSha) return { error: 'Core gate: sealed plan is missing.' };
+  const baselineEvent = events.find((event) =>
+    event.type === 'PLAN_PATH_BASELINE_RECORDED' &&
+    event.runId === state.runId && event.generation === state.generation);
+  if (!baselineEvent || typeof baselineEvent.payload.planPathBaseline !== 'object' ||
+      baselineEvent.payload.planSha256 !== planSha ||
+      baselineEvent.payload.planPathBaselineSha256 !== sha256(Buffer.from(canonicalJson(baselineEvent.payload.planPathBaseline)))) {
+    return { error: 'Core gate: matching sealed plan baseline evidence is missing or stale.' };
+  }
+  if (state.generation > 0 && !events.some((event) =>
+    event.type === 'PLAN_GENERATION_ADVANCED' && event.runId === state.runId &&
+    event.generation === state.generation && event.payload.planPath === state.plan &&
+    event.payload.planSha256 === planSha && event.payload.previousGeneration === state.generation - 1)) {
+    return { error: 'Core gate: matching plan generation advancement is missing.' };
+  }
+  let planBody;
+  try { planBody = fs.readFileSync(planFile, 'utf8'); } catch { return { error: 'Core gate: sealed plan became unreadable.' }; }
+  const parsed = parseStrictPlan(planBody, baselineEvent.payload.planPathBaseline);
+  if (!parsed.ok) return { error: `Core gate: strict plan state is invalid (${parsed.code}).` };
+  return { planSha, parsed };
+}
+
+function coreReceiptProblem(cwd, event, context, expectedVerdict) {
+  const checked = validateCoreDispatch(event.payload, context);
+  if (!checked.ok) return `Core gate: dispatch ${event.payload.dispatchId || '(unknown)'} is invalid (${checked.code}).`;
+  const tail = String(event.payload.evidencePath).replace(/^\.glm-hammer\/evidence\//, '');
+  const receiptFile = evidencePath(cwd, ...tail.split('/'));
+  const body = (() => { try { return fs.readFileSync(receiptFile, 'utf8'); } catch { return null; } })();
+  if (body == null) return `Core gate: dispatch evidence is missing (${tail}).`;
+  const receipt = parseReceiptV1(body, {
+    runId: context.runId,
+    generation: context.generation,
+    planSha256: context.planSha256,
+  });
+  const reviewRole = event.payload.role === 'security-reviewer' || event.payload.role === 'qa-reviewer';
+  if (!receipt.ok || receipt.value.DISPATCH_ID !== event.payload.dispatchId ||
+      receipt.value.ROLE !== event.payload.role ||
+      receipt.value.EVIDENCE_PATH !== event.payload.evidencePath ||
+      (reviewRole && receipt.value.SOURCE_SNAPSHOT_SHA256 !== context.reviewSnapshot?.snapshotSha256) ||
+      (!reviewRole && receipt.value.SOURCE_SNAPSHOT_SHA256 !== undefined) ||
+      !new RegExp(`VERDICT:\\s*${expectedVerdict}\\b`, 'i').test(body)) {
+    return `Core gate: dispatch receipt is forged or mismatched (${tail}).`;
+  }
+  let stat;
+  try { stat = fs.statSync(receiptFile); } catch { return `Core gate: dispatch evidence is unreadable (${tail}).`; }
+  if (stat.size !== event.payload.receiptSize || Math.floor(stat.mtimeMs) !== event.payload.receiptMtimeMs ||
+      sha256File(receiptFile) !== event.payload.receiptSha256) {
+    return `Core gate: dispatch receipt provenance changed (${tail}).`;
+  }
+  return null;
+}
+
+function coreDispatches(cwd, state, events, plan, reviewSnapshot) {
+  const generationStartMs = events.filter((event) => event.runId === state.runId && event.generation === state.generation)
+    .reduce((first, event) => Math.min(first, event.atMs), Number.MAX_SAFE_INTEGER);
+  const context = {
+    runId: state.runId,
+    generation: state.generation,
+    generationStartMs,
+    nowMs: Date.now(),
+    planSha256: plan.planSha,
+    reviewSnapshot,
+  };
+  const current = events.filter((event) =>
+    event.type === 'CORE_DISPATCH_COMPLETED' && event.runId === state.runId && event.generation === state.generation);
+  const needs = [];
+  if (state.phase === 'forge') {
+    for (const role of CRITICS) needs.push({ role, verdict: 'APPROVE', match: (event) => event.payload.role === role });
+  } else {
+    for (const task of plan.parsed.obligations) {
+      needs.push({ role: 'validator', verdict: 'PASS', match: (event) => event.payload.role === 'validator' && event.payload.evidencePath.includes(`/task-${task.taskId}/`) });
+      needs.push({ role: 'implementation-critic', verdict: 'APPROVE', match: (event) => event.payload.role === 'implementation-critic' && event.payload.evidencePath.includes(`/task-${task.taskId}/`) });
+    }
+    needs.push({ role: 'security-reviewer', verdict: 'PASS', match: (event) => event.payload.role === 'security-reviewer' });
+    needs.push({ role: 'qa-reviewer', verdict: 'PASS', match: (event) => event.payload.role === 'qa-reviewer' });
+  }
+  for (const need of needs) {
+    const event = [...current].reverse().find(need.match);
+    if (!event) return `Core gate: required ${need.role} dispatch evidence is missing.`;
+    const problem = coreReceiptProblem(cwd, event, context, need.verdict);
+    if (problem) return problem;
+  }
+  return null;
+}
+
 function coreCommonGuard(cwd, state) {
-  const journal = require('./lib').readJournal(cwd);
-  if (!journal.ok) return `Core gate: journal authority is invalid (${journal.code}).`;
-  if (journal.events.length === 0) return 'Core gate: authoritative journal is missing for a non-idle core run.';
-  const runEvents = journal.events.filter((event) => event.runId === state.runId);
-  if (runEvents.some((event) => event.type === 'RUN_COMPLETED' || event.type === 'RUN_ENDED_UNVERIFIED')) return null;
+  const artifactProblem = phase0Problem(cwd);
+  if (artifactProblem) return artifactProblem;
+  const journal = readJournal(cwd);
+  if (!journal.ok || journal.events.length === 0) {
+    return `Core gate: authoritative journal is missing or invalid (${journal.code || 'JOURNAL_EMPTY'}).`;
+  }
+  const events = journal.events;
+  const runEvents = events.filter((event) => event.runId === state.runId);
+  if (runEvents.some((event) =>
+    event.type === 'RUN_ENDED_UNVERIFIED' && event.generation === state.generation)) return null;
+  if (state.phase === 'forge' && state.status === 'done') {
+    return 'Core gate: forge status done is not a legal verified completion state; use approved after the full critic round.';
+  }
+  if (!runEvents.some((event) => event.type === 'ROUTER_ARMED' && event.generation === state.generation)) {
+    return 'Core gate: ROUTER_ARMED evidence is missing for this run/generation.';
+  }
   if (state.status === 'awaiting-user') {
-    if (runEvents.some((event) => event.type === 'USER_QUESTION_OBSERVED' &&
-      !runEvents.some((terminal) => terminal.type === 'RUN_ENDED_UNVERIFIED' &&
-        terminal.payload.questionProofEventId === event.eventId))) return null;
+    const proof = runEvents.find((event) => event.generation === state.generation && event.type === 'USER_QUESTION_OBSERVED');
+    if (proof && !runEvents.some((event) => event.type === 'RUN_ENDED_UNVERIFIED' && event.payload.questionProofEventId === proof.eventId)) return null;
     return 'Core gate: awaiting-user requires an approved unconsumed structural question proof.';
   }
-  if (state.phase === 'forge') return forgeGate(cwd, state);
-  if (state.phase === 'hammer') return hammerGate(cwd, state);
-  return `Core gate: unsupported core phase ${state.phase}.`;
+  const plan = corePlan(cwd, state, events);
+  if (plan.error) return plan.error;
+  const transition = runEvents.find((event) => {
+    if (event.type !== 'PHASE_TRANSITIONED' || event.generation !== state.generation ||
+        event.payload.toPhase !== state.phase ||
+        (event.payload.toStatus !== state.status && state.status !== 'done')) return false;
+    const statuses = event.payload.toPhase === 'forge'
+      ? new Set(['recon', 'drafting', 'critique', 'awaiting-user', 'approved', 'done'])
+      : new Set(['executing', 'review', 'awaiting-user', 'done']);
+    return statuses.has(event.payload.toStatus) &&
+      ['idle', 'forge', 'hammer'].includes(event.payload.fromPhase) &&
+      typeof event.payload.fromStatus === 'string';
+  });
+  if (!transition) return 'Core gate: legal phase transition evidence is missing.';
+  const snapshotEvent = [...runEvents].reverse().find((event) =>
+    event.type === 'SOURCE_REVIEW_SNAPSHOT_RECORDED' && event.generation === state.generation);
+  let reviewSnapshot = null;
+  if (state.phase === 'hammer') {
+    if (!snapshotEvent || !HASH.test(snapshotEvent.payload.snapshotSha256)) {
+      return 'Core gate: source review snapshot evidence is missing.';
+    }
+    reviewSnapshot = { runId: state.runId, generation: state.generation, atMs: snapshotEvent.atMs, snapshotSha256: snapshotEvent.payload.snapshotSha256 };
+    const fresh = buildSourceSnapshot(cwd, {
+      baselineHead: state.baselineHead || null,
+      declaredPaths: state.declaredPaths || plan.parsed.declaredPaths,
+    });
+    if (!fresh.ok || fresh.sha256 !== reviewSnapshot.snapshotSha256) {
+      return 'Core gate: source changed after the bound review snapshot; record a new snapshot and redispatch security/QA.';
+    }
+  }
+  const dispatchProblem = coreDispatches(cwd, state, events, plan, reviewSnapshot);
+  if (dispatchProblem) return dispatchProblem;
+  const completed = runEvents.find((event) =>
+    event.type === 'RUN_COMPLETED' && event.generation === state.generation &&
+    event.payload.planSha256 === plan.planSha &&
+    event.payload.reviewSnapshotSha256 === (reviewSnapshot ? reviewSnapshot.snapshotSha256 : '0'.repeat(64)));
+  if (!completed) {
+    const appended = appendJournalPayload(cwd, 'RUN_COMPLETED', state.runId, state.generation, {
+      planSha256: plan.planSha,
+      reviewSnapshotSha256: reviewSnapshot ? reviewSnapshot.snapshotSha256 : '0'.repeat(64),
+    });
+    if (!appended.ok) return `Core gate: could not record verified completion (${appended.code}).`;
+  }
+  return null;
 }
 
 
@@ -453,8 +681,22 @@ try {
   const cwd = input.cwd || process.cwd();
   const state = readState(cwd);
 
-  if (!state || !state.phase || state.phase === 'idle') process.exit(0);
-  const core = state.schemaVersion === 1 && typeof state.runId === 'string' && Number.isSafeInteger(state.generation);
+  if (!state || !state.phase || state.phase === 'idle') {
+    const authority = readJournal(cwd);
+    const journalExists = fs.existsSync(path.join(cwd, '.glm-hammer', 'control-events.jsonl'));
+    const latest = authority.ok ? authority.events.at(-1) : null;
+    if ((journalExists && !authority.ok) ||
+        (latest && !['RUN_COMPLETED', 'RUN_ENDED_UNVERIFIED'].includes(latest.type))) {
+      emit({
+        decision: 'block',
+        reason: '[glm-hammer | attempt 1/6] Core gate: authoritative journal has a nonterminal run but state is missing or idle.',
+      });
+    }
+    process.exit(0);
+  }
+  const core = state.schemaVersion === 1 &&
+    (state.phase === 'forge' || state.phase === 'hammer') &&
+    typeof state.runId === 'string' && Number.isSafeInteger(state.generation);
   let reason = null;
   let blocks = state.stopBlocks || 0;
   if (core) {

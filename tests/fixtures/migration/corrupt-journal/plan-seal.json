@@ -1,0 +1,5 @@
+{
+  "tests/fixtures/migration/corrupt-journal/plan.md": {
+    "sha256": "d50ad80c2f1644b8320db728bf6f6287e038c3e7115429c0f6aabd57ad6e6b3e"
+  }
+}

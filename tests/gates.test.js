@@ -1,11 +1,108 @@
 'use strict';
 // Zero-dep smoke tests for glm-hammer hook gates. Run from repo root: node tests/gates.test.js
-const { spawnSync } = require('child_process');
+const { spawnSync, execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
+function findStrictPlanner(root) {
+  const persisted = path.join(root, 'docs', 'glm-hammer', 'plans', '2026-07-12-harness-hardening-execution.md');
+  return fs.existsSync(persisted) ? persisted : null;
+}
+
+function scanPlanAndContracts() {
+  const planPath = findStrictPlanner(ROOT);
+  if (!planPath) throw new Error('strict reviewed Planner artifact not found');
+  const plan = fs.readFileSync(planPath, 'utf8');
+  const taskStart = plan.indexOf('### Task 1:');
+  const sequenceStart = plan.indexOf('## Sequencing');
+  const taskBlock = plan.slice(taskStart, sequenceStart >= 0 ? sequenceStart : plan.length);
+  const headings = [...taskBlock.matchAll(/^### Task ([1-7]): .+$/gm)].map((match) => Number(match[1]));
+  if (headings.join(',') !== '1,2,3,4,5,6,7') throw new Error('Task 1-7 headings are not contiguous');
+  for (let id = 1; id <= 7; id++) {
+    const start = taskBlock.indexOf(`### Task ${id}:`);
+    const end = id === 7 ? taskBlock.length : taskBlock.indexOf(`### Task ${id + 1}:`);
+    const block = taskBlock.slice(start, end);
+    if (!/^\*\*Dependencies:\*\* (?:None|Task [1-6](?:, Task [1-6])*)$/m.test(block)) throw new Error(`Task ${id} dependencies invalid`);
+    if (!/^\*\*Files:\*\*$/m.test(block) || !/^- (?:Create|Modify|Test): `[^`]+`$/m.test(block)) throw new Error(`Task ${id} files invalid`);
+    if (!/^\*\*Acceptance Criteria:\*\*$/m.test(block) || !/^- \[ \] .+$/m.test(block)) throw new Error(`Task ${id} acceptance invalid`);
+    const steps = [...block.matchAll(/^\*\*Step ([1-9]\d*):\*\*/gm)].map((match) => Number(match[1]));
+    if (!steps.length || steps.some((step, index) => step !== index + 1)) throw new Error(`Task ${id} steps invalid`);
+  }
+  if (/\b(?:TODO|TBD|FIXME)\b/.test(taskBlock) || /<[^>\n]+>/.test(taskBlock)) throw new Error('unfinished plan marker');
+  const coreLib = require(path.join(ROOT, 'hooks', 'scripts', 'lib.js'));
+  const syntax = coreLib.parseStrictPlan(plan, null, { syntaxOnly: true });
+  if (!syntax.ok) throw new Error(`strict plan syntax failed: ${syntax.code}`);
+  const baselineReceipt = JSON.parse(fs.readFileSync(
+    path.join(ROOT, 'tests', 'fixtures', 'plans', 'generation-baseline.json'), 'utf8'));
+  if (baselineReceipt.schemaVersion !== 1 ||
+      baselineReceipt.planSha256 !== coreLib.sha256(Buffer.from(plan))) {
+    throw new Error('sealed generation plan receipt mismatch');
+  }
+  const baseline = coreLib.capturePlanPathBaselineAtCommit(
+    ROOT, baselineReceipt.baseCommit, syntax.declaredPaths);
+  if (!baseline.ok || baseline.sha256 !== baselineReceipt.baselineSha256) {
+    throw new Error(`generation baseline failed: ${baseline.code || 'sealed hash mismatch'}`);
+  }
+  const strict = coreLib.parseStrictPlan(plan, baseline.baseline);
+  if (!strict.ok || strict.tasks.length !== 7 || strict.obligations.length !== 7) {
+    throw new Error(`strict plan obligations failed: ${strict.code || 'count'}`);
+  }
+  for (const required of [
+    '- Create: `hooks/scripts/review-snapshot.js`',
+    '- Modify: `hooks/hooks.json`',
+  ]) if (!taskBlock.includes(required)) throw new Error(`strict change inventory missing: ${required}`);
+  const changedPaths = new Set([
+    ...execFileSync('git', ['diff', '--name-only', baselineReceipt.baseCommit], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n').filter(Boolean),
+    ...execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n').filter(Boolean).map((line) => line.slice(3)),
+  ]);
+  const undeclared = [...changedPaths].filter((file) =>
+    !file.startsWith('.gjc/') && !file.startsWith('docs/glm-hammer/reviews/') &&
+    !syntax.declaredPaths.includes(file));
+  if (undeclared.length) throw new Error(`strict change inventory incomplete: ${undeclared.sort().join(',')}`);
+  const hooks = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks', 'hooks.json'), 'utf8')).hooks;
+  const allowed = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse', 'PostToolUseFailure', 'Stop'];
+  if (Object.keys(hooks).some((event) => !allowed.includes(event))) throw new Error('unsupported hook event');
+  const preReview = hooks.PreToolUse.find((entry) => entry.matcher === 'Agent|Task');
+  const postDispatch = hooks.PostToolUse.find((entry) => entry.matcher === 'Agent|Task');
+  const stopCommands = hooks.Stop.flatMap((entry) => entry.hooks)
+    .map((hook) => hook.args && hook.args[0]);
+  if (!preReview || preReview.hooks.length !== 1 ||
+      preReview.hooks[0].args[0] !== '${ZCODE_PLUGIN_ROOT}/hooks/scripts/review-snapshot.js' ||
+      !postDispatch || postDispatch.hooks.length !== 1 ||
+      postDispatch.hooks[0].args[0] !== '${ZCODE_PLUGIN_ROOT}/hooks/scripts/dispatch-log.js' ||
+      stopCommands[0] !== '${ZCODE_PLUGIN_ROOT}/hooks/scripts/question-observer.js' ||
+      stopCommands[1] !== '${ZCODE_PLUGIN_ROOT}/hooks/scripts/stop-gate.js') {
+    throw new Error('core provenance hook wiring drift');
+  }
+  const matrix = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'runtime', 'capability-matrix.json'), 'utf8'));
+  if (JSON.stringify(matrix.supportedZCodeEvents) !== JSON.stringify(allowed) || matrix.f11 !== 'OPEN') throw new Error('runtime matrix drift');
+  const approval = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'runtime', 'approval.json'), 'utf8'));
+  if (approval.architecturalStatus !== 'CLEAR' || approval.recommendation !== 'APPROVE') throw new Error('runtime approval missing');
+  const amendment = fs.readFileSync(path.join(ROOT, 'docs', 'glm-hammer', 'plans', '2026-07-12-harness-hardening-runtime-amendment.md'), 'utf8');
+  if (!amendment.includes('zcode-cli') || !amendment.includes('0.15.2') ||
+      !amendment.includes(matrix.engineIdentity.artifactSha256)) throw new Error('runtime amendment missing');
+  for (const [file, token] of [
+    ['hooks/scripts/stop-gate.js', 'coreCommonGuard'],
+    ['hooks/scripts/dispatch-log.js', 'CORE_DISPATCH_COMPLETED'],
+    ['hooks/scripts/plan-gate.js', 'PLAN_PATH_BASELINE_RECORDED'],
+    ['hooks/scripts/route-intent.js', 'ROUTER_ARMED'],
+  ]) if (!fs.readFileSync(path.join(ROOT, file), 'utf8').includes(token)) throw new Error(`production wiring missing: ${file}`);
+  process.stdout.write('PLAN_AND_CONTRACTS_CLEAN\n');
+}
+
+if (process.argv.includes('--scan-plan-and-contracts')) {
+  try {
+    scanPlanAndContracts();
+    process.exit(0);
+  } catch (error) {
+    process.stderr.write(`PLAN_AND_CONTRACTS_DIRTY: ${error.message}\n`);
+    process.exit(1);
+  }
+}
 let failures = 0;
 function check(name, cond, detail) {
   console.log(`${cond ? 'ok  ' : 'FAIL'} - ${name}${!cond && detail ? ` :: ${detail}` : ''}`);
@@ -864,5 +961,377 @@ check(
   });
   check('core-v1 UNVERIFIED replay is idempotent', replay.ok && replay.replay === true && lib.readJournal(unverifiedDir).events.filter((entry) => entry.type === 'RUN_ENDED_UNVERIFIED').length === 1);
   fs.rmSync(unverifiedDir, { recursive: true, force: true });
+}
+// (core-runtime) invoke the real Stop observer and Stop gate processes.
+{
+  const coreProbe = fs.mkdtempSync(path.join(os.tmpdir(), 'glm-core-runtime-'));
+  fs.mkdirSync(path.join(coreProbe, '.glm-hammer'), { recursive: true });
+  const runId = '123e4567-e89b-42d3-a456-426614174000';
+  lib.writeState(coreProbe, { schemaVersion: 1, runId, generation: 0, phase: 'hammer', status: 'awaiting-user' });
+  const observer = (responseText) => spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'question-observer.js')], {
+    input: JSON.stringify({
+      cwd: coreProbe, hookEventName: 'Stop', hook_event_name: 'Stop',
+      responsePreview: 'preview', responseText, transcriptPath: 'none',
+      transcript_path: 'none', toolCallCount: 1, turnId: 'turn-1',
+    }), encoding: 'utf8',
+  });
+  observer('context low');
+  check('core Stop observer ignores raw transcript markers', lib.readJournal(coreProbe).events.length === 0);
+  observer(JSON.stringify({ question: { requiresUserResponse: true } }));
+  observer(JSON.stringify({ question: { requiresUserResponse: true } }));
+  check('core Stop observer records one concrete question proof', lib.readJournal(coreProbe).events.filter((e) => e.type === 'USER_QUESTION_OBSERVED').length === 1);
+  const blocked = spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'stop-gate.js')], {
+    input: JSON.stringify({ cwd: coreProbe }), encoding: 'utf8',
+  });
+  check('real core Stop gate blocks missing authoritative evidence', blocked.stdout.includes('"decision":"block"'));
+  const localRuntime = path.join(coreProbe, 'tests', 'fixtures', 'runtime');
+  fs.mkdirSync(localRuntime, { recursive: true });
+  fs.copyFileSync(path.join(ROOT, 'tests', 'fixtures', 'runtime', 'manifest.json'),
+    path.join(localRuntime, 'manifest.json'));
+  const phase0Blocked = spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'stop-gate.js')], {
+    input: JSON.stringify({ cwd: coreProbe }), encoding: 'utf8',
+  });
+  check('Phase 0 incomplete approval blocks later core gates',
+    phase0Blocked.stdout.includes('missing or invalid Phase-0 artifact capabilities.json'));
+  fs.rmSync(path.join(coreProbe, 'tests'), { recursive: true, force: true });
+  const stateFile = path.join(coreProbe, '.glm-hammer', 'state.json');
+  const stateBytes = fs.readFileSync(stateFile);
+  fs.rmSync(stateFile);
+  const stateDeleted = spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'stop-gate.js')], {
+    input: JSON.stringify({ cwd: coreProbe }), encoding: 'utf8',
+  });
+  check('state deletion alone cannot disarm a nonterminal authoritative journal',
+    stateDeleted.stdout.includes('nonterminal run but state is missing or idle'));
+  fs.writeFileSync(stateFile, stateBytes);
+  const idleState = JSON.parse(stateBytes);
+  idleState.phase = 'idle';
+  idleState.status = 'idle';
+  fs.writeFileSync(stateFile, JSON.stringify(idleState));
+  const idleProjection = spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'stop-gate.js')], {
+    input: JSON.stringify({ cwd: coreProbe }), encoding: 'utf8',
+  });
+  check('mutable idle projection cannot disarm a nonterminal authoritative journal',
+    idleProjection.stdout.includes('nonterminal run but state is missing or idle'));
+  fs.writeFileSync(stateFile, stateBytes);
+  fs.rmSync(path.join(coreProbe, '.glm-hammer', 'control-events.jsonl'));
+  const journalDeleted = spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'stop-gate.js')], {
+    input: JSON.stringify({ cwd: coreProbe }), encoding: 'utf8',
+  });
+  check('journal deletion with nonidle state blocks without migration credit',
+    journalDeleted.stdout.includes('authoritative journal is missing or invalid'));
+  fs.rmSync(path.join(coreProbe, '.glm-hammer', 'state.json'));
+  const bothDeleted = spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'stop-gate.js')], {
+    input: JSON.stringify({ cwd: coreProbe }), encoding: 'utf8',
+  });
+  check('both control files deleted remains explicitly undetectable and silent', bothDeleted.stdout === '');
+  fs.rmSync(coreProbe, { recursive: true, force: true });
+}
+// (core-runtime-bootstrap) a fresh execution request creates an authenticated core run.
+{
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'glm-core-bootstrap-'));
+  const planDir = path.join(cwd, 'docs', 'glm-hammer', 'plans');
+  fs.mkdirSync(planDir, { recursive: true });
+  fs.writeFileSync(path.join(planDir, 'approved.md'), [
+    '### Task 1: Bootstrap',
+    '**Goal:** bootstrap a sealed execution',
+    '**Dependencies:** None',
+    '**Files:**',
+    '- Create: `artifact.txt`',
+    '**Acceptance Criteria:**',
+    '- [ ] The artifact is created.',
+    '**Step 1:** Create the artifact.',
+    '',
+  ].join('\n'));
+  const prompt = 'implement the plan';
+  const routed = spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'route-intent.js')], {
+    input: JSON.stringify({ cwd, prompt }),
+    encoding: 'utf8',
+  });
+  const state = lib.readState(cwd);
+  const journal = lib.readJournal(cwd);
+  check('fresh core execution request bootstraps schema-v1 hammer run',
+    routed.status === 0 && state.schemaVersion === 1 && state.phase === 'hammer' &&
+    state.status === 'executing' && /^[0-9a-f-]{36}$/.test(state.runId) && state.generation === 0);
+  check('fresh core bootstrap records authenticated route, transition, and sealed generation baseline',
+    journal.ok && journal.events.length === 3 &&
+    journal.events[0].type === 'ROUTER_ARMED' && journal.events[1].type === 'PHASE_TRANSITIONED' &&
+    journal.events[2].type === 'PLAN_PATH_BASELINE_RECORDED' &&
+    journal.events.every((event) => event.runId === state.runId && event.generation === 0) &&
+    state.plan === 'docs/glm-hammer/plans/approved.md' &&
+    /^[0-9a-f]{64}$/.test(state.planSha256));
+  const expectedSnapshot = lib.buildSourceSnapshot(cwd, { baselineHead: null, declaredPaths: ['artifact.txt'] });
+  check('fresh bootstrap authenticates prompt and baseline snapshot',
+    journal.events[0].payload.promptEventHash === lib.sha256(Buffer.from(prompt)) &&
+    expectedSnapshot.ok &&
+    journal.events[0].payload.baselineSnapshotSha256 === expectedSnapshot.sha256);
+  check('fresh bootstrap seals the exact plan baseline',
+    journal.events[2].payload.planSha256 === state.planSha256 &&
+    journal.events[2].payload.planPathBaselineSha256 ===
+      lib.sha256(Buffer.from(lib.canonicalJson(journal.events[2].payload.planPathBaseline))));
+  const missingPlan = fs.mkdtempSync(path.join(os.tmpdir(), 'glm-core-missing-plan-'));
+  spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'route-intent.js')], {
+    input: JSON.stringify({ cwd: missingPlan, prompt }),
+    encoding: 'utf8',
+  });
+  check('execution request without a plan does not bootstrap a core run',
+    !lib.readState(missingPlan) && lib.readJournal(missingPlan).events.length === 0);
+  const neutral = fs.mkdtempSync(path.join(os.tmpdir(), 'glm-core-neutral-'));
+  spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'route-intent.js')], {
+    input: JSON.stringify({ cwd: neutral, prompt: 'explain the repository' }),
+    encoding: 'utf8',
+  });
+  check('unmatched request does not bootstrap a core run',
+    !lib.readState(neutral) && lib.readJournal(neutral).events.length === 0);
+  const orphan = fs.mkdtempSync(path.join(os.tmpdir(), 'glm-core-orphan-'));
+  fs.mkdirSync(path.join(orphan, 'docs', 'glm-hammer', 'plans'), { recursive: true });
+  fs.writeFileSync(path.join(orphan, 'docs', 'glm-hammer', 'plans', 'approved.md'), '# Approved plan\n');
+  lib.writeState(orphan, {
+    schemaVersion: 1,
+    phase: 'hammer',
+    status: 'done',
+    runId: '123e4567-e89b-42d3-a456-426614174099',
+    generation: 0,
+    generationStartMs: Date.now(),
+  });
+  spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'route-intent.js')], {
+    input: JSON.stringify({ cwd: orphan, prompt }),
+    encoding: 'utf8',
+  });
+  check('mutable done state without terminal journal cannot bootstrap or self-authenticate',
+    lib.readState(orphan).runId === '123e4567-e89b-42d3-a456-426614174099' &&
+    lib.readJournal(orphan).events.length === 0);
+  lib.appendJournalPayload(orphan, 'RUN_COMPLETED', '123e4567-e89b-42d3-a456-426614174099', 0, {
+    planSha256: '0'.repeat(64),
+    reviewSnapshotSha256: '0'.repeat(64),
+  });
+  spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'route-intent.js')], {
+    input: JSON.stringify({ cwd: orphan, prompt }),
+    encoding: 'utf8',
+  });
+  check('orphan completion without ROUTER_ARMED cannot authorize renewal',
+    lib.readState(orphan).runId === '123e4567-e89b-42d3-a456-426614174099' &&
+    lib.readJournal(orphan).events.length === 1);
+  fs.rmSync(missingPlan, { recursive: true, force: true });
+  fs.rmSync(neutral, { recursive: true, force: true });
+  fs.rmSync(orphan, { recursive: true, force: true });
+  const terminal = lib.appendJournalPayload(cwd, 'RUN_COMPLETED', state.runId, 0, {
+    planSha256: '0'.repeat(64),
+    reviewSnapshotSha256: '0'.repeat(64),
+  });
+  const rerouted = spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'route-intent.js')], {
+    input: JSON.stringify({ cwd, prompt: 'implement the plan again' }),
+    encoding: 'utf8',
+  });
+  const nextState = lib.readState(cwd);
+  const nextJournal = lib.readJournal(cwd);
+  check('completed core run rotates into a fresh authenticated run',
+    terminal.ok && rerouted.status === 0 && nextState.runId !== state.runId &&
+    nextJournal.events.slice(-3).every((event) => event.runId === nextState.runId) &&
+    nextJournal.events.at(-3).type === 'ROUTER_ARMED' &&
+    nextJournal.events.at(-2).type === 'PHASE_TRANSITIONED' &&
+    nextJournal.events.at(-1).type === 'PLAN_PATH_BASELINE_RECORDED');
+  fs.rmSync(cwd, { recursive: true, force: true });
+}
+// (core-runtime-positive) exercise real positive and adversarial forge/hammer Stop paths.
+{
+  const STOP = path.join(ROOT, 'hooks', 'scripts', 'stop-gate.js');
+  const roleUuids = [
+    '123e4567-e89b-42d3-a456-426614174101',
+    '123e4567-e89b-42d3-a456-426614174102',
+    '123e4567-e89b-42d3-a456-426614174103',
+    '123e4567-e89b-42d3-a456-426614174104',
+    '123e4567-e89b-42d3-a456-426614174105',
+    '123e4567-e89b-42d3-a456-426614174106',
+    '123e4567-e89b-42d3-a456-426614174107',
+  ];
+  function runStop(cwd) {
+    return spawnSync(process.execPath, [STOP], { input: JSON.stringify({ cwd }), encoding: 'utf8' });
+  }
+  function coreFixture(phase) {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), `glm-core-${phase}-`));
+    fs.mkdirSync(path.join(cwd, '.glm-hammer'), { recursive: true });
+    fs.writeFileSync(path.join(cwd, 'README.md'), 'baseline\n');
+    const planPath = 'docs/glm-hammer/plans/runtime.md';
+    const absolutePlan = path.join(cwd, planPath);
+    fs.mkdirSync(path.dirname(absolutePlan), { recursive: true });
+    const plan = [
+      '### Task 1: Runtime',
+      '**Goal:** verify runtime',
+      '**Dependencies:** None',
+      '**Files:**',
+      '- Modify: `README.md`',
+      '**Acceptance Criteria:**',
+      '- [ ] verified',
+      '**Step 1:** verify',
+      '',
+    ].join('\n');
+    fs.writeFileSync(absolutePlan, plan);
+    const baseline = lib.capturePlanPathBaseline(cwd, ['README.md']);
+    const planSha256 = lib.sha256(Buffer.from(plan));
+    const runId = phase === 'forge'
+      ? '123e4567-e89b-42d3-a456-426614174010'
+      : '123e4567-e89b-42d3-a456-426614174020';
+    const status = phase === 'forge' ? 'approved' : 'done';
+    lib.writeState(cwd, {
+      schemaVersion: 1, runId, generation: 0, generationStartMs: Date.now(),
+      phase, status, plan: planPath, planSha256, baselineHead: null, declaredPaths: ['README.md'],
+    });
+    const routeHash = lib.sha256(Buffer.from(`${phase}-route`));
+    lib.appendJournalPayload(cwd, 'ROUTER_ARMED', runId, 0, {
+      baselineHead: null, baselineSnapshotSha256: routeHash, promptEventHash: routeHash,
+    });
+    lib.appendJournalPayload(cwd, 'PHASE_TRANSITIONED', runId, 0, {
+      fromPhase: 'idle', fromStatus: 'idle', parentPhase: null, resumePhase: null,
+      toPhase: phase, toStatus: status,
+    });
+    lib.appendJournalPayload(cwd, 'PLAN_PATH_BASELINE_RECORDED', runId, 0, {
+      planPathBaseline: baseline.baseline,
+      planPathBaselineSha256: baseline.sha256,
+      planSha256,
+    });
+    return { cwd, runId, planPath, planSha256 };
+  }
+  function addDispatch(fixture, role, tail, verdict, dispatchId, sourceSnapshot) {
+    const evidencePath = `.glm-hammer/evidence/${tail}`;
+    const file = path.join(fixture.cwd, '.glm-hammer', 'evidence', ...tail.split('/'));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const kind = role.endsWith('-critic') && role !== 'implementation-critic'
+      ? ['FORGE_ROUND', '1']
+      : role === 'validator' || role === 'implementation-critic'
+        ? ['TASK_ID', '1']
+        : ['REVIEW_KIND', role === 'security-reviewer' ? 'security' : 'qa'];
+    const header = [
+      'RECEIPT_VERSION: 1',
+      `RUN_ID: ${fixture.runId}`,
+      `ROLE: ${role}`,
+      `EVIDENCE_PATH: ${evidencePath}`,
+      `PLAN_SHA256: ${fixture.planSha256}`,
+      'GENERATION: 0',
+      `${kind[0]}: ${kind[1]}`,
+      `DISPATCH_ID: ${dispatchId}`,
+    ];
+    if (sourceSnapshot) header.push(`SOURCE_SNAPSHOT_SHA256: ${sourceSnapshot.snapshotSha256}`);
+    const body = `${header.join('\n')}\nCHECKS:\n- runtime evidence\nVERDICT: ${verdict}\n`;
+    fs.writeFileSync(file, body);
+    const stat = fs.statSync(file);
+    const atMs = Math.max(fixture.generationStartMs || 0, Math.floor(stat.mtimeMs));
+    const prompt = sourceSnapshot
+      ? `Review ${evidencePath} at source snapshot ${sourceSnapshot.snapshotSha256}`
+      : `Validate ${evidencePath}`;
+    const toolInput = {
+      role,
+      description: prompt,
+      prompt,
+      evidencePath,
+      dispatchId,
+      invocationMs: atMs,
+      completionMs: atMs,
+    };
+    if (sourceSnapshot) toolInput.sourceSnapshotSha256 = sourceSnapshot.snapshotSha256;
+    const dispatched = spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'dispatch-log.js')], {
+      input: JSON.stringify({
+        cwd: fixture.cwd,
+        observedAtMs: atMs,
+        tool_input: toolInput,
+      }),
+      encoding: 'utf8',
+    });
+    const appended = [...lib.readJournal(fixture.cwd).events].reverse().find((event) =>
+      event.type === 'CORE_DISPATCH_COMPLETED' && event.payload.dispatchId === dispatchId);
+    check(`core fixture records ${role} through PostToolUse provenance`, dispatched.status === 0 && appended,
+      dispatched.stderr);
+    check(`core ${role} provenance binds prompt, receipt, identity, and snapshot`,
+      appended && appended.payload.evidencePath === evidencePath &&
+      appended.payload.role === role &&
+      appended.payload.receiptSha256 === lib.sha256(Buffer.from(body)) &&
+      appended.payload.receiptSize === Buffer.byteLength(body) &&
+      appended.payload.toolEventHash === lib.sha256(Buffer.from(lib.canonicalJson(toolInput))) &&
+      appended.payload.sourceSnapshotSha256 === (sourceSnapshot ? sourceSnapshot.snapshotSha256 : null) &&
+      appended.payload.invocationMs === atMs && appended.payload.completionMs === atMs &&
+      appended.runId === fixture.runId && appended.generation === 0);
+    return file;
+  }
+
+  const forge = coreFixture('forge');
+  forge.generationStartMs = lib.readJournal(forge.cwd).events[0].atMs;
+  ['feasibility-critic', 'integration-critic', 'coverage-critic'].forEach((role, index) => {
+    addDispatch(forge, role, `critics/round-1/${role}.md`, 'APPROVE', roleUuids[index], null);
+  });
+  const forgePass = runStop(forge.cwd);
+  check('real core forge Stop records verified completion', forgePass.stdout === '' &&
+    lib.readJournal(forge.cwd).events.some((event) => event.type === 'RUN_COMPLETED'));
+  const forgeState = lib.readState(forge.cwd);
+  forgeState.status = 'done';
+  lib.writeState(forge.cwd, forgeState);
+  check('real core forge done bypass blocks', runStop(forge.cwd).stdout.includes('"decision":"block"'));
+  forgeState.status = 'approved';
+  forgeState.generation = 1;
+  lib.writeState(forge.cwd, forgeState);
+  check('real core stale generation blocks', runStop(forge.cwd).stdout.includes('"decision":"block"'));
+  forgeState.generation = 0;
+  lib.writeState(forge.cwd, forgeState);
+  const forgedReceipt = path.join(forge.cwd, '.glm-hammer/evidence/critics/round-1/coverage-critic.md');
+  fs.appendFileSync(forgedReceipt, 'tampered\n');
+  check('real core forged receipt blocks', runStop(forge.cwd).stdout.includes('"decision":"block"'));
+  fs.rmSync(forge.cwd, { recursive: true, force: true });
+
+  const hammer = coreFixture('hammer');
+  hammer.generationStartMs = lib.readJournal(hammer.cwd).events[0].atMs;
+  const snapshot = lib.buildSourceSnapshot(hammer.cwd, { baselineHead: null, declaredPaths: ['README.md'] });
+  const deniedReview = spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'review-snapshot.js')], {
+    input: JSON.stringify({
+      cwd: hammer.cwd,
+      tool_input: { role: 'security-reviewer', sourceSnapshotSha256: '0'.repeat(64), prompt: 'review stale snapshot' },
+    }),
+    encoding: 'utf8',
+  });
+  check('review dispatch with stale snapshot is denied before provenance is recorded',
+    deniedReview.status === 2 && !lib.readJournal(hammer.cwd).events.some((event) => event.type === 'SOURCE_REVIEW_SNAPSHOT_RECORDED'));
+  const snapshotDispatch = spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'review-snapshot.js')], {
+    input: JSON.stringify({
+      cwd: hammer.cwd,
+      tool_input: {
+        role: 'security-reviewer',
+        sourceSnapshotSha256: snapshot.sha256,
+        prompt: `Review the frozen source snapshot ${snapshot.sha256}`,
+      },
+    }),
+    encoding: 'utf8',
+  });
+  const snapshotEvent = [...lib.readJournal(hammer.cwd).events].reverse()
+    .find((event) => event.type === 'SOURCE_REVIEW_SNAPSHOT_RECORDED');
+  check('review snapshot is bound before dispatch', snapshotDispatch.status === 0 && snapshotEvent);
+  const reviewSnapshot = { snapshotSha256: snapshot.sha256, atMs: snapshotEvent.atMs };
+  addDispatch(hammer, 'validator', 'tasks/task-1/validator.md', 'PASS', roleUuids[3], null);
+  addDispatch(hammer, 'implementation-critic', 'tasks/task-1/critic.md', 'APPROVE', roleUuids[4], null);
+  addDispatch(hammer, 'security-reviewer', 'reviews/security.md', 'PASS', roleUuids[5], reviewSnapshot);
+  addDispatch(hammer, 'qa-reviewer', 'reviews/qa.md', 'PASS', roleUuids[6], reviewSnapshot);
+  const hammerPass = runStop(hammer.cwd);
+  check('real core hammer Stop records snapshot-bound completion', hammerPass.stdout === '' &&
+    lib.readJournal(hammer.cwd).events.some((event) => event.type === 'RUN_COMPLETED'), hammerPass.stdout);
+  fs.writeFileSync(path.join(hammer.cwd, 'README.md'), 'mutated after review\n');
+  check('real core post-snapshot mutation blocks', runStop(hammer.cwd).stdout.includes('"decision":"block"'));
+  const refreshed = lib.buildSourceSnapshot(hammer.cwd, { baselineHead: null, declaredPaths: ['README.md'] });
+  const refreshedDispatch = spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'scripts', 'review-snapshot.js')], {
+    input: JSON.stringify({
+      cwd: hammer.cwd,
+      tool_input: {
+        role: 'security-reviewer',
+        sourceSnapshotSha256: refreshed.sha256,
+        prompt: `Review the refreshed source snapshot ${refreshed.sha256}`,
+      },
+    }),
+    encoding: 'utf8',
+  });
+  const refreshedEvent = [...lib.readJournal(hammer.cwd).events].reverse()
+    .find((event) => event.type === 'SOURCE_REVIEW_SNAPSHOT_RECORDED');
+  const refreshedSnapshot = { snapshotSha256: refreshed.sha256, atMs: refreshedEvent.atMs };
+  addDispatch(hammer, 'security-reviewer', 'reviews/security.md', 'PASS',
+    '123e4567-e89b-42d3-a456-426614174108', refreshedSnapshot);
+  addDispatch(hammer, 'qa-reviewer', 'reviews/qa.md', 'PASS',
+    '123e4567-e89b-42d3-a456-426614174109', refreshedSnapshot);
+  check('fresh snapshot and reviewer redispatch recover after source mutation',
+    refreshedDispatch.status === 0 && runStop(hammer.cwd).stdout === '');
+  fs.rmSync(hammer.cwd, { recursive: true, force: true });
 }
 process.exit(failures ? 1 : 0);

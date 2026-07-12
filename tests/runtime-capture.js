@@ -119,6 +119,22 @@ function selectRecords(records, event, predicate, count, label) {
   if (selected.length < count) fail('CAPTURE_EVENT_COUNT', label);
   return selected.slice(0, count);
 }
+function verifyCaptureSequence() {
+  validateIdentity();
+  const inputDir = validateCaptureDirectory(arg('--input-dir'), false);
+  const records = fs.readdirSync(inputDir).filter((name) => name.endsWith('.json')).sort().map((name) => {
+    const file = path.join(inputDir, name);
+    return { name, safe: sanitizeFixture(readJson(file, 'CAPTURE_SOURCE_INVALID')) };
+  });
+  const normal = selectRecords(records, 'SessionStart', (record) => Object.hasOwn(record.payloadShape, 'turnId'), 1, 'SessionStart normal');
+  const compact = selectRecords(records, 'SessionStart', (record) => !Object.hasOwn(record.payloadShape, 'turnId'), 1, 'SessionStart compact');
+  const prompt = selectRecords(records, 'UserPromptSubmit', null, 1, 'UserPromptSubmit');
+  const post = selectRecords(records, 'PostToolUse', null, 3, 'PostToolUse');
+  const stops = selectRecords(records, 'Stop', null, 2, 'Stop');
+  if (normal.length !== 1 || compact.length !== 1 || prompt.length !== 1 ||
+      post.length < 3 || stops.length < 2) fail('CAPTURE_SEQUENCE_INCOMPLETE');
+  process.stdout.write('CAPTURE_SEQUENCE_VERIFIED\n');
+}
 function promote() {
   validateIdentity();
   const inputDir = validateCaptureDirectory(arg('--input-dir'), false);
@@ -189,5 +205,6 @@ function promote() {
 }
 
 if (process.argv.includes('--validate-environment')) validateEnvironment();
+else if (process.argv.includes('--verify-input-dir')) verifyCaptureSequence();
 else if (process.argv.includes('--promote')) promote();
 else fail('CAPTURE_USAGE');

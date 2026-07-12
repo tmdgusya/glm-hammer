@@ -3,5 +3,5 @@
   "code": "MIGRATION_CORRUPT",
   "journalEvents": 0,
   "quarantinePreservesBytes": true,
-  "quarantine": "state.json"
+  "quarantine": "control-events.jsonl"
 }

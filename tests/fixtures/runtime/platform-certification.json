@@ -14,11 +14,15 @@
   "fsKind": "local",
   "localSingleHost": true,
   "journalSchemaVersion": 1,
-  "testScriptSha256": "b0e6c43306c80c9ecfabcbe77bc168632290c38e402ab0674d8edf9078d2d6c8",
+  "testScriptSha256": "4bb1eba40f9f39995f578e0cb83ecdadd4dafb2ee4c42701baeead083d013c93",
   "capabilitiesSha256": "b5c9a69fb328ba5657e5b6a5650fa7769456a55ac0b51f3016473dfbd17f8bab",
   "result": {
     "path": "tests/fixtures/runtime/journal-stress-result.json",
-    "sha256": "b950f33877a815cdfc2f6edd9d6102dbb1780bbd9ca9700c3cc1ff955c19eef0"
+    "sha256": "6ab444187b8aff76f91d45e0dedf4bed870b379acc16af2a0891815190781936"
+  },
+  "journalEvidence": {
+    "liveJournalSha256": "bc055c17e38096bb04dda3d15a08d653e59aed837a450072fd4cbbbbf8d0306b",
+    "rotatedArchiveSha256": "1c3a3dd12c438bbe33dfdf1105388846e0bb10bf1d6f5f61e4f5beb4a2d10e62"
   },
   "reviewerId": "local-operator",
   "status": "APPROVE"

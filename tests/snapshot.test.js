@@ -15,6 +15,28 @@ let first = lib.buildSourceSnapshot(tmp, { baselineHead, declaredPaths: ['tracke
 if (!first.ok || !lib.validateSourceSnapshot(first.snapshot).ok) throw new Error(`initial snapshot failed: ${first.code}`);
 const future = first.snapshot.entries.find((entry) => entry.path === 'future.txt');
 if (!future || future.status !== 'ABSENT' || future.sha256 !== null) throw new Error('declared absent path not represented');
+const reviewSnapshot = { runId: '123e4567-e89b-42d3-a456-426614174000', generation: 0, atMs: 100, snapshotSha256: first.sha256 };
+const reviewPayload = {
+  dispatchId: '123e4567-e89b-42d3-a456-426614174001',
+  role: 'security-reviewer',
+  evidencePath: '.glm-hammer/evidence/reviews/security.md',
+  invocationMs: 101, completionMs: 102, observedAtMs: 103, receiptMtimeMs: 102,
+  receiptSize: 10, receiptSha256: 'a'.repeat(64), toolEventHash: 'b'.repeat(64),
+  sourceSnapshotSha256: first.sha256,
+};
+if (!lib.validateCoreDispatch(reviewPayload, {
+  runId: reviewSnapshot.runId, generation: reviewSnapshot.generation,
+  generationStartMs: 0, nowMs: 200, reviewSnapshot,
+}).ok) throw new Error('snapshot-bound review dispatch rejected');
+fs.writeFileSync(path.join(tmp, 'tracked.txt'), 'post-snapshot mutation\n');
+const recomputed = lib.buildSourceSnapshot(tmp, { baselineHead, declaredPaths: ['tracked.txt', 'future.txt'] });
+if (!recomputed.ok || recomputed.sha256 === reviewSnapshot.snapshotSha256) {
+  throw new Error('post-snapshot mutation did not invalidate completion evidence');
+}
+if (lib.validateCoreDispatch(reviewPayload, {
+  runId: reviewSnapshot.runId, generation: reviewSnapshot.generation,
+  generationStartMs: 0, nowMs: 200, reviewSnapshot: { ...reviewSnapshot, snapshotSha256: recomputed.sha256 },
+}).ok) throw new Error('stale review dispatch remained eligible after mutation');
 fs.writeFileSync(path.join(tmp, 'tracked.txt'), 'two\n');
 const changed = lib.buildSourceSnapshot(tmp, { baselineHead, declaredPaths: ['tracked.txt', 'future.txt'] });
 if (!changed.ok || changed.sha256 === first.sha256) throw new Error('dirty content did not invalidate snapshot');

@@ -85,7 +85,7 @@ Optional config at `.glm-hammer/diagnostics.json`:
 
 ### ZCode compatibility (per engine verification)
 
-Verified directly against the ZCode distribution (`zcode.cjs` v3.2.x) and the built-in `diagnosing-hooks` guide:
+Verified against the exact `zcode-cli` 0.15.2 engine artifact (`/opt/ZCode/resources/glm/zcode.cjs`, SHA-256 `0f2ab95e39876fd639a15eb207fd42ca692d145f44ae5093714071a07de9c16e`) and the built-in `diagnosing-hooks` guide. The environment-specific approval and capture amendment is recorded in `docs/glm-hammer/plans/2026-07-12-harness-hardening-runtime-amendment.md`:
 
 - Supported events are **exactly seven**: SessionStart, UserPromptSubmit, PreToolUse, PermissionRequest, PostToolUse, PostToolUseFailure, Stop. **SubagentStop/PreCompact/Notification are unsupported** → this plugin uses only the Stop gate
 - `${ZCODE_PLUGIN_ROOT}` substitution, `statusMessage`, matcher (case-sensitive regex) are supported. `Write`/`Edit` ← `ApplyPatch` alias auto-mapping

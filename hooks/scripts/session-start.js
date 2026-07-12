@@ -3,16 +3,47 @@
 // If .glm-hammer/state.json shows an unfinished run, inject a resume brief so the
 // agent picks the loop back up after a restart, /clear, or compaction — without
 // the user having to say "continue".
-const { readStdin, readState, writeState, emitContext } = require('./lib');
+const {
+  readStdin, readState, writeState, emitContext, appendJournalPayload, buildSourceSnapshot,
+  migrateLegacyCoreRun,
+} = require('./lib');
 
 try {
   const input = readStdin();
   const cwd = input.cwd || process.cwd();
-  const state = readState(cwd);
+  let state = readState(cwd);
+  if (state && state.schemaVersion !== 1 && (state.phase === 'forge' || state.phase === 'hammer') &&
+      state.status && state.status !== 'done') {
+    const migrated = migrateLegacyCoreRun(cwd);
+    if (!migrated.ok) process.exit(0);
+    state = readState(cwd);
+  }
 
   const active =
     state && state.phase && state.phase !== 'idle' && state.status && state.status !== 'done';
   if (!active) process.exit(0);
+  const core = state.schemaVersion === 1 && state.runId && Number.isSafeInteger(state.generation);
+  if (core) {
+    const snapshot = buildSourceSnapshot(cwd, {
+      baselineHead: state.baselineHead || null,
+      declaredPaths: state.declaredPaths || [],
+    });
+    if (!snapshot.ok) process.exit(0);
+    const source = appendJournalPayload(cwd, 'SOURCE_BASELINE_RECORDED', state.runId, state.generation, {
+      head: snapshot.snapshot.currentHead,
+      scope: snapshot.snapshot.scope,
+      snapshotSha256: snapshot.sha256,
+    });
+    const transition = source.ok && appendJournalPayload(cwd, 'PHASE_TRANSITIONED', state.runId, state.generation, {
+      fromPhase: state.previousPhase || state.phase,
+      fromStatus: state.previousStatus || state.status,
+      parentPhase: state.parentPhase || null,
+      resumePhase: state.resumePhase || state.phase,
+      toPhase: state.phase,
+      toStatus: state.status,
+    });
+    if (!transition || !transition.ok) process.exit(0);
+  }
 
   // Fresh session: the old block counter is stale.
   state.stopBlocks = 0;

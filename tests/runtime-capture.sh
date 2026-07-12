@@ -2,13 +2,15 @@
 set -eu
 
 usage() {
-  printf '%s\n' 'usage: tests/runtime-capture.sh --output-dir DIR' >&2
+  printf '%s\n' 'usage: tests/runtime-capture.sh --output-dir DIR [--run-headless]' >&2
   exit 64
 }
 
-[ "$#" -eq 2 ] || usage
+[ "$#" -eq 2 ] || { [ "$#" -eq 3 ] && [ "$3" = '--run-headless' ]; } || usage
 [ "$1" = '--output-dir' ] || usage
 OUTPUT_DIR=$2
+RUN_HEADLESS=0
+[ "$#" -eq 2 ] || RUN_HEADLESS=1
 : "${GLM_HAMMER_CAPTURE_DIR:?GLM_HAMMER_CAPTURE_DIR is required}"
 : "${ZCODE_BIN:?ZCODE_BIN is required}"
 : "${ZCODE_ENGINE_ARTIFACT:?ZCODE_ENGINE_ARTIFACT is required}"
@@ -52,5 +54,28 @@ cat >"$PLUGIN_DIR/hooks.json" <<JSON
 {"hooks":{"SessionStart":[{"hooks":[{"type":"process","command":"node","args":["$PLUGIN_DIR/capture-hook.js","SessionStart"]}]}],"UserPromptSubmit":[{"hooks":[{"type":"process","command":"node","args":["$PLUGIN_DIR/capture-hook.js","UserPromptSubmit"]}]}],"PostToolUse":[{"matcher":"Agent|Task","hooks":[{"type":"process","command":"node","args":["$PLUGIN_DIR/capture-hook.js","PostToolUse"]}]}],"Stop":[{"hooks":[{"type":"process","command":"node","args":["$PLUGIN_DIR/capture-hook.js","Stop"]}]}]}}
 JSON
 
-printf '%s\n' 'Trigger normal SessionStart, a matched prompt, Stop, documented compaction SessionStart, one Agent/Task completion, and two parallel completions with this temporary hooks file.' >&2
-printf '%s\n' 'CAPTURE_PLUGIN_READY'
+WORK_DIR=$OUTPUT_REAL/workspace
+mkdir "$WORK_DIR"
+cat >"$WORK_DIR/zcode.json" <<JSON
+{"hooks":{"enabled":true,"timeoutMs":60000,"events":{"SessionStart":[{"hooks":[{"type":"process","command":"node","args":["$PLUGIN_DIR/capture-hook.js","SessionStart"]}]}],"UserPromptSubmit":[{"hooks":[{"type":"process","command":"node","args":["$PLUGIN_DIR/capture-hook.js","UserPromptSubmit"]}]}],"PostToolUse":[{"matcher":"Agent|Task","hooks":[{"type":"process","command":"node","args":["$PLUGIN_DIR/capture-hook.js","PostToolUse"]}]}],"Stop":[{"hooks":[{"type":"process","command":"node","args":["$PLUGIN_DIR/capture-hook.js","Stop"]}]}]}}}
+JSON
+
+if [ "$RUN_HEADLESS" -eq 0 ]; then
+  printf '%s\n' 'Trigger normal SessionStart, a matched prompt, Stop, documented compaction SessionStart, one Agent/Task completion, and two parallel completions with this temporary hooks file.' >&2
+  printf '%s\n' 'CAPTURE_PLUGIN_READY'
+  exit 0
+fi
+
+FIRST=$("$ZCODE_BIN" --cwd "$WORK_DIR" --mode yolo --prompt 'Harness capture: use the Agent or Task tool exactly once to ask a subagent to answer OK, then answer CAPTURE_DONE.' --json)
+SESSION_ID=$(printf '%s' "$FIRST" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=s.match(/"sessionId"\s*:\s*"(sess_[a-z0-9-]+)"/);if(!m)process.exit(1);process.stdout.write(m[1])})')
+"$ZCODE_BIN" --cwd "$WORK_DIR" --resume "$SESSION_ID" --mode yolo --prompt '/compact retain only that this is a hook capture' --json >/dev/null
+ATTEMPT=0
+while [ "$ATTEMPT" -lt 3 ]; do
+  "$ZCODE_BIN" --cwd "$WORK_DIR" --resume "$SESSION_ID" --mode yolo --prompt 'Mandatory harness action: call the Agent or Task tool exactly twice in the same assistant turn, in parallel. Each subagent must return OK. Do not answer directly before both tool calls complete; then answer PARALLEL_CAPTURE_DONE.' --json >/dev/null
+  if node tests/runtime-capture.js --verify-input-dir --input-dir "$OUTPUT_REAL" >/dev/null 2>&1; then
+    printf '%s\n' 'CAPTURE_SEQUENCE_VERIFIED'
+    exit 0
+  fi
+  ATTEMPT=$((ATTEMPT + 1))
+done
+node tests/runtime-capture.js --verify-input-dir --input-dir "$OUTPUT_REAL"
