@@ -800,4 +800,69 @@ check(
   );
 }
 
+// (core-v1) strict grammar, generation-relative virtual files, receipt order,
+// dispatch freshness, and canonical journal envelopes.
+{
+  const plan = [
+    '### Task 1: Create',
+    '**Goal:** create',
+    '**Dependencies:** None',
+    '**Files:**',
+    '- Create: `a.txt`',
+    '**Acceptance Criteria:**',
+    '- [ ] created',
+    '**Step 1:** create it',
+    '',
+    '### Task 2: Consume',
+    '**Goal:** consume',
+    '**Dependencies:** Task 1',
+    '**Files:**',
+    '- Modify: `a.txt`',
+    '**Acceptance Criteria:**',
+    '- [ ] consumed',
+    '**Step 1:** consume it',
+  ].join('\n');
+  const baseline = { 'a.txt': { state: 'ABSENT', type: 'absent', sha256: null } };
+  const parsed = lib.parseStrictPlan(plan, baseline);
+  check('core-v1 strict virtual plan accepts create then dependent modify', parsed.ok, parsed.code);
+  check('core-v1 baseline missing blocks deterministically', lib.parseStrictPlan(plan, null).code === 'PLAN_PATH_BASELINE_MISSING');
+  const badDependency = plan.replace('**Dependencies:** Task 1', '**Dependencies:** None');
+  check('core-v1 virtual consumer requires creator dependency', lib.parseStrictPlan(badDependency, baseline).code === 'PLAN_PATH_DEPENDENCY');
+  const event = {
+    schemaVersion: 1,
+    type: 'ROUTER_ARMED',
+    eventId: `evt_${'a'.repeat(32)}`,
+    runId: '123e4567-e89b-42d3-a456-426614174000',
+    seq: 1,
+    generation: 0,
+    atMs: 1,
+    payload: { baselineHead: null, baselineSnapshotSha256: 'b'.repeat(64), promptEventHash: 'c'.repeat(64) },
+  };
+  check('core-v1 canonical journal event validates', lib.parseJournalLine(lib.canonicalJson(event), { nowMs: 1 }).ok);
+  check('core-v1 noncanonical journal event blocks', lib.parseJournalLine(JSON.stringify(event), { nowMs: 1 }).code === 'EVT_JSON');
+  const unverifiedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'glm-unverified-'));
+  const proof = lib.appendJournalPayload(unverifiedDir, 'USER_QUESTION_OBSERVED', event.runId, 0, {
+    observerEventHash: 'd'.repeat(64),
+    observerKind: 'stop-transcript',
+    turnId: 'turn-1',
+  });
+  const token = `glm-hammer override-unverified ${event.runId} 0`;
+  const ended = lib.atomicUnverified(unverifiedDir, { prompt: token }, {
+    phase: 'hammer',
+    runId: event.runId,
+    generation: 0,
+    questionProof: { eventId: proof.value.eventId, eventHash: lib.sha256(Buffer.from(lib.canonicalJson(proof.value))), consumed: false },
+    unresolvedGateCodes: ['CORE_REVIEW_SNAPSHOT_MISSING'],
+  });
+  const terminalEvents = lib.readJournal(unverifiedDir).events.filter((entry) => entry.type === 'RUN_ENDED_UNVERIFIED');
+  const projection = lib.readState(unverifiedDir);
+  check('core-v1 structural proof emits one atomic UNVERIFIED terminal', ended.ok && terminalEvents.length === 1);
+  check('core-v1 UNVERIFIED projection has no verified fields', projection.verification === 'UNVERIFIED' && !Object.keys(projection).some((key) => /^verified/i.test(key)));
+  const replay = lib.atomicUnverified(unverifiedDir, { prompt: token }, {
+    phase: 'hammer', runId: event.runId, generation: 0,
+    questionProof: { eventId: proof.value.eventId, eventHash: 'd'.repeat(64), consumed: false },
+  });
+  check('core-v1 UNVERIFIED replay is idempotent', replay.ok && replay.replay === true && lib.readJournal(unverifiedDir).events.filter((entry) => entry.type === 'RUN_ENDED_UNVERIFIED').length === 1);
+  fs.rmSync(unverifiedDir, { recursive: true, force: true });
+}
 process.exit(failures ? 1 : 0);

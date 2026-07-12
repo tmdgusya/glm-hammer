@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    { "name": "invocation-future", "code": "DSP_TIME_INVOCATION_FUTURE" },
+    { "name": "completion-future", "code": "DSP_TIME_COMPLETION_FUTURE" },
+    { "name": "observed-future", "code": "DSP_TIME_OBSERVED_FUTURE" },
+    { "name": "receipt-time", "code": "DSP_RECEIPT_TIME" },
+    { "name": "review-missing", "code": "CORE_REVIEW_SNAPSHOT_MISSING" },
+    { "name": "review-mismatch", "code": "CORE_REVIEW_SNAPSHOT_MISMATCH" },
+    { "name": "review-predates", "code": "CORE_REVIEW_PREDATES_SNAPSHOT" }
+  ]
+}

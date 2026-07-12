@@ -1,0 +1,46 @@
+[
+  {
+    "event": "PostToolUse",
+    "payloadShape": {
+      "cwd": "string",
+      "hookEventName": "string",
+      "hook_event_name": "string",
+      "mode": "string",
+      "sessionId": "string",
+      "session_id": "string",
+      "timestamp": "string",
+      "toolCallId": "string",
+      "toolInput": "object",
+      "toolName": "string",
+      "toolResultPreview": "string",
+      "tool_input": "object",
+      "tool_name": "string",
+      "tool_use_id": "string",
+      "traceId": "string",
+      "turnId": "string"
+    },
+    "sourceKind": "live-capture"
+  },
+  {
+    "event": "PostToolUse",
+    "payloadShape": {
+      "cwd": "string",
+      "hookEventName": "string",
+      "hook_event_name": "string",
+      "mode": "string",
+      "sessionId": "string",
+      "session_id": "string",
+      "timestamp": "string",
+      "toolCallId": "string",
+      "toolInput": "object",
+      "toolName": "string",
+      "toolResultPreview": "string",
+      "tool_input": "object",
+      "tool_name": "string",
+      "tool_use_id": "string",
+      "traceId": "string",
+      "turnId": "string"
+    },
+    "sourceKind": "live-capture"
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "event": "SessionStart",
+  "payloadShape": {
+    "cwd": "string",
+    "hookEventName": "string",
+    "hook_event_name": "string",
+    "mode": "string",
+    "sessionId": "string",
+    "session_id": "string",
+    "source": "string",
+    "timestamp": "string",
+    "traceId": "string"
+  },
+  "sourceKind": "live-capture"
+}

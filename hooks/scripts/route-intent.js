@@ -5,13 +5,30 @@
 //   picks forge / blueprint / hammer without the user naming a skill.
 const fs = require('fs');
 const path = require('path');
-const { readStdin, readState, writeState, emitContext } = require('./lib');
+const { readStdin, readState, writeState, emitContext, readJournal, canonicalJson, sha256, atomicUnverified } = require('./lib');
 
 try {
   const input = readStdin();
   const cwd = input.cwd || process.cwd();
   const prompt = String(input.prompt || '');
   const state = readState(cwd);
+  if (state && state.schemaVersion === 1 && state.runId && Number.isSafeInteger(state.generation) &&
+      /^glm-hammer override-unverified /.test(prompt.trim())) {
+    const journal = readJournal(cwd);
+    if (!journal.ok) process.exit(0);
+    const proof = [...journal.events].reverse().find((event) =>
+      event.runId === state.runId && event.generation === state.generation && event.type === 'USER_QUESTION_OBSERVED'
+    );
+    if (!proof) process.exit(0);
+    atomicUnverified(cwd, input, {
+      phase: state.phase,
+      runId: state.runId,
+      generation: state.generation,
+      questionProof: { eventId: proof.eventId, eventHash: sha256(Buffer.from(canonicalJson(proof))), consumed: false },
+      unresolvedGateCodes: state.unresolvedGateCodes || [],
+    });
+    process.exit(0);
+  }
 
   const active =
     state &&
