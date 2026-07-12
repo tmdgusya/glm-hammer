@@ -51,10 +51,20 @@ FINDINGS:
 
 ## Evidence Receipt (mandatory)
 
-Your prompt includes an evidence file path. Before returning, write your FULL report (the `CHECKS:` block first, then the `VERDICT:` line, then findings with the evidence you gathered) to that path via Bash, creating parent directories — this write is the one exception to "do not modify any file". Then end your final message with exactly:
+Your prompt includes the approved dispatch metadata: `runId`, `generation`, role `implementation-critic`, `evidencePath`, `planSha256`, positive `taskId`, and a preallocated `dispatchId`. Reject the dispatch instead of guessing any missing value.
+
+Before returning, write the FULL report to `evidencePath` via Bash, creating parent directories; this receipt is the only permitted write. Begin with these exact ordered lines, then the existing `CHECKS:` block, `VERDICT:`, and findings:
 
 ```
-EVIDENCE_RECORDED: <path>
+RECEIPT_VERSION: 1
+RUN_ID: <runId>
+ROLE: implementation-critic
+EVIDENCE_PATH: <evidencePath>
+PLAN_SHA256: <planSha256>
+GENERATION: <generation>
+TASK_ID: <taskId>
+DISPATCH_ID: <dispatchId>
+CHECKS:
 ```
 
-A verdict without its receipt on disk does not count — the harness will reject it.
+End the final message with exactly `EVIDENCE_RECORDED: <evidencePath>`. A receipt without the approved metadata-v1 tuple and matching journaled dispatch does not count.

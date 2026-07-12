@@ -44,10 +44,21 @@ FINDINGS:
 
 ## Evidence Receipt (mandatory)
 
-Your prompt includes an evidence file path (normally `.glm-hammer/evidence/reviews/qa.md`). Before returning, write your FULL report (the `CHECKS:` block first, then the `VERDICT:` line, then findings with commands and outputs) to that path via Bash, creating parent directories. Then end your final message with exactly:
+Your prompt includes the approved dispatch metadata: `runId`, `generation`, role `qa-reviewer`, `evidencePath`, `planSha256`, `reviewKind: qa`, a preallocated `dispatchId`, `sourceSnapshotSha256`, and `invocationMs`. Reject the dispatch instead of guessing any missing value. The invocation must not predate the recorded source-review snapshot.
+
+Before returning, write the FULL report to `evidencePath` via Bash, creating parent directories. Begin with these exact ordered lines, then the existing `CHECKS:` block, `VERDICT:`, and findings:
 
 ```
-EVIDENCE_RECORDED: <path>
+RECEIPT_VERSION: 1
+RUN_ID: <runId>
+ROLE: qa-reviewer
+EVIDENCE_PATH: <evidencePath>
+PLAN_SHA256: <planSha256>
+GENERATION: <generation>
+REVIEW_KIND: qa
+DISPATCH_ID: <dispatchId>
+SOURCE_SNAPSHOT_SHA256: <sourceSnapshotSha256>
+CHECKS:
 ```
 
-A verdict without its receipt on disk does not count — the harness will reject it.
+End the final message with exactly `EVIDENCE_RECORDED: <evidencePath>`. A missing/mismatched snapshot binding, pre-snapshot invocation, or non-matching journaled dispatch does not count.

@@ -15,15 +15,17 @@ Exploration precedes questions; critics precede presentation. The user should ne
 
 1. **Recon before questions.** Dispatch exploration subagents FIRST. Ask the user only what recon provably cannot answer, and cite recon findings in every question.
 2. **Critic panel is mandatory.** Before the plan is presented to the user, dispatch the three critic agents (`feasibility-critic`, `integration-critic`, `coverage-critic`) in parallel. All must return `APPROVE`. The Stop hook blocks turn completion while approvals are missing.
-3. **Any plan edit invalidates approvals.** The PostToolUse hook resets the approval count when the plan file changes. Re-run the full panel after every revision.
-4. **No verdict without a receipt.** Each critic writes its own verdict file under `.glm-hammer/evidence/critics/round-<N>/<critic-name>.md` and ends its final message with `EVIDENCE_RECORDED: <path>`. The Stop hook verifies the receipts on disk — an approval claimed in state without a matching `VERDICT: APPROVE` receipt blocks the turn. Receipts are also checked for substance (`CHECKS:` block + real content) and must be **dispatch-backed**: each critic's dispatch prompt must contain its evidence path — the hooks record every subagent dispatch and reject receipts no critic was pointed at. Writing a receipt yourself therefore does not work.
-5. **The plan file is written via the Write/Edit tools only.** Every tracked write reseals its content hash; editing the plan via Bash (redirection, sed, heredoc) breaks the seal, voids all approvals, and the Stop hook blocks until the plan is re-saved via Write.
+3. **Any plan edit creates a new generation.** A tracked edit reseals the whole plan, records the complete declared-path baseline, advances the generation, and invalidates every earlier approval. Re-run the full panel after every revision. Later live filesystem state must never be used to reinterpret the sealed generation.
+4. **No verdict without metadata-v1 provenance.** Preallocate a unique dispatch ID before invoking each critic and include `runId`, `generation`, `role`, `evidencePath`, `planSha256`, `forgeRound`, and `dispatchId` in the approved tool input and prompt. Each critic writes its receipt under `.glm-hammer/evidence/critics/round-<N>/<critic-name>.md`, ends with `EVIDENCE_RECORDED: <path>`, and uses this exact ordered header before `CHECKS:`:
+   `RECEIPT_VERSION: 1`, `RUN_ID: <uuid>`, `ROLE: <critic-name>`, `EVIDENCE_PATH: <path>`, `PLAN_SHA256: <64 lowercase hex>`, `GENERATION: <canonical nonnegative decimal>`, `FORGE_ROUND: <positive integer>`, `DISPATCH_ID: <uuid>`.
+   The Stop hook accepts only a matching journaled `CORE_DISPATCH_COMPLETED`; a projection claim or self-written receipt earns no credit.
+5. **The plan file is written via the Write/Edit tools only.** Every tracked write reseals its complete bytes and declared-path baseline. Editing via Bash, a missing/broken seal, an incomplete baseline, or an untracked generation blocks.
 6. **No placeholders.** TBD / TODO / "implement later" / criteria requiring interpretation are plan failures.
-7. **Keep `.glm-hammer/state.json` current.** Hooks read it to enforce the gates — see State Protocol below.
+7. **The certified journal is authoritative.** `.glm-hammer/state.json` is a disposable projection only. Request legal phase transitions through the registered core hook flow; never edit the projection to manufacture approval, awaiting-user, or completion.
 
 ## State Protocol
 
-Maintain `.glm-hammer/state.json` at the project root. Update it at every checkpoint marked ⟨state⟩ in the process below. Shape:
+The certified journal is the authority for run ID, generation, legal transitions, critic dispatch completion, question proof, and terminal state. Keep `.glm-hammer/state.json` only as the hook-maintained projection shown below; direct edits do not confer credit:
 
 ```json
 {
@@ -43,9 +45,11 @@ Maintain `.glm-hammer/state.json` at the project root. Update it at every checkp
 ```
 
 Rules:
-- Set `status: "awaiting-user"` **before ending a turn that needs a user answer** (question rounds, plan approval). Otherwise the Stop hook will bounce you back.
-- Never write `approved` yourself unless `critics.approved >= critics.required` with all verdicts `APPROVE` in the current round. The hooks cross-check this; falsifying state is a protocol violation.
+- Request the legal `awaiting-user` transition only when a user answer is genuinely required and the structural question proof exists. Do not write the projection to create it.
+- Request approval only after all required current-generation `CORE_DISPATCH_COMPLETED` events and matching APPROVE receipts exist. The journal computes the projected approval; never write it yourself.
 - Add `.glm-hammer/` to `.gitignore` if the project has one and it is not already listed.
+
+- A question round may pause only after the approved structural question observer records proof. Raw transcript markers never release forge. With current unconsumed proof, the exact whole trimmed request `glm-hammer override-unverified RUNID GENERATION` may atomically end that run as UNVERIFIED, never PASS. Without structural proof or approved runtime identity there is no override; remain fail-closed.
 
 ## Process
 
@@ -74,29 +78,32 @@ prompt: |
 
 ### Phase 2: Minimal Question Round ⟨state: awaiting-user if asked⟩
 
-After recon returns, list remaining ambiguities. For each, first check: *can recon answer this?* If yes, answer it yourself. Bundle the survivors (max 4, independent only) into ONE AskUserQuestion round, each grounded in findings ("recon shows X in `services/y.ts` — follow or replace?"). If nothing survives, ask nothing and proceed. Prefer proposing a defensible default over asking.
+After recon returns, list remaining ambiguities. For each, first check: *can recon answer this?* If yes, answer it yourself. Bundle the survivors (max 4, independent only) into ONE AskUserQuestion round, each grounded in findings ("recon shows X in `services/y.ts` — follow or replace?"). If nothing survives, ask nothing and proceed. Prefer proposing a defensible default over asking. A pause is valid only after the capability-selected observer records approved structural question proof; raw prompt/transcript text is not proof.
 
 ### Phase 3: Draft the Plan ⟨state: drafting⟩
 
 Write the plan to `docs/glm-hammer/plans/YYYY-MM-DD-<feature>.md`. The plan must be executable by a worker with zero context:
 
-**Header:** Goal (one sentence), Architecture (2-3 sentences), Tech Stack, Work Scope (in/out), and a **Verification Strategy** (level: e2e | integration | test-suite | build-only, exact command, what passing proves — discovered in recon; if none exists, add Task 0 creating minimal verification).
+**Header:** Goal (one sentence), Architecture (2-3 sentences), Tech Stack, Work Scope (in/out), and a **Verification Strategy** (level: e2e | integration | test-suite | build-only, exact command, what passing proves — discovered in recon; if none exists, Task 1 creates minimal verification).
 
-**File structure mapping:** every file to create/modify, anchored by symbol names (never line numbers).
+**Declared paths:** every path appears in a task's Files list. At seal time, the hook records the complete normalized path map as ABSENT, FILE, or SYMLINK. Do not add generated flags, self-hashes, directories, special files, duplicate-normalized paths, or out-of-root paths.
 
-**Tasks**, each with:
+**Tasks** use this strict grammar:
 
 ```markdown
 ### Task N: [Name]
 **Goal:** [one sentence — copied verbatim into validator prompts later]
-**Dependencies:** [Task K | None (can run in parallel)]
-**Files:** Create/Modify (anchor: symbol)/Test — exact paths
+**Dependencies:** None
+**Files:**
+- Create: `path/to/new-file`
+- Modify: `path/to/existing-file`
+- Test: `path/to/test-file`
 **Acceptance Criteria:**
-- [ ] [binary-decidable: "`pytest tests/x.py::test_y` passes", "POST /api/users without email returns 400"]
-- [ ] **Step 1..N:** one action each, with actual code blocks and exact commands + expected output
+- [ ] [binary-decidable outcome]
+**Step 1:** [one concrete action with actual code/command and expected output]
 ```
 
-Criteria rules: every task has ≥1 criterion; every criterion is decidable by reading code and running commands with zero judgment; verdict is the AND of criteria; criteria state outcomes, not implementation. Parallel tasks must not touch the same file. The last task is always a **Final Verification Task** running the Verification Strategy command plus the full test suite.
+Tasks are contiguous from 1. Dependencies are exactly `None` or comma-space-separated, strictly ascending unique lower `Task N` references; every repeated writer and consumer of an earlier creation has a transitive dependency. File entries are exactly `- Create: \`path\``, `- Modify: \`path\``, or `- Test: \`path\`` with one repository-relative path. Acceptance items are column-one unchecked checkboxes, and steps are contiguous exact `**Step N:**` markers. Create/Modify/Test legality is evaluated against the sealed generation baseline plus virtual task order, never the later live workspace. Every task has at least one criterion; criteria are decidable outcomes, not implementation choices. The last task is Final Verification and runs the Verification Strategy plus the full suite.
 
 ### Phase 4: The Anvil — Critic Panel ⟨state: critique⟩
 
@@ -108,15 +115,15 @@ Dispatch the three critics **in parallel**, each as a subagent via the Agent too
 | `integration-critic` | Dependencies, interface contracts, parallel-task file conflicts, shared state |
 | `coverage-critic` | Spec coverage, criteria decidability, placeholder scan, verification completeness |
 
-Each critic receives ONLY: the plan file path, the original user request (verbatim), and its **evidence output path** `.glm-hammer/evidence/critics/round-<N>/<critic-name>.md`. Not your reasoning, not recon summaries — critics re-verify against the codebase themselves.
+For each critic, first preallocate the dispatch ID. The approved tool input and prompt receive ONLY the plan path, original request verbatim, evidence path, and the exact metadata tuple `runId`, `generation`, `role`, `evidencePath`, `planSha256`, `forgeRound: <N>`, `dispatchId`. Not your reasoning or recon summaries. All tuple values must describe the same sealed generation.
 
-Each critic answers a **fixed binary checklist** (YES/NO per question defined in its agent file; verdict = APPROVE iff all YES/N-A — computed, not felt), writes its full report to its evidence path, and ends with `EVIDENCE_RECORDED: <path>`. Before recording a verdict in state, confirm the receipt exists and its `VERDICT:` line matches what the critic reported — a critic that returned APPROVE but wrote no file (or wrote REJECT) has not approved anything. Record every verified verdict in state ⟨state: critics.verdicts, critics.approved⟩.
+Each critic answers its fixed checklist, writes the ordered metadata-v1 header followed by its full `CHECKS:` report, and ends with `EVIDENCE_RECORDED: <path>`. Before projecting a verdict, confirm that the receipt and journaled `CORE_DISPATCH_COMPLETED` match byte-for-byte provenance, timing, stat, and hash requirements. A missing dispatch, late allocation, stale generation, mismatched role/path/hash, or self-written receipt has not approved anything.
 
-If the runtime does not expose the critics as named agent types, read each definition from this plugin's `agents/<name>.md` and dispatch a general-purpose subagent with that file's body as its instructions plus the three inputs above.
+If the runtime does not expose named critic types, a general-purpose subagent may use the corresponding `agents/<name>.md` body, but it still receives the same preallocated approved input and metadata-v1 contract. Unsupported Agent observation or unapproved runtime identity is fail-closed; it never enables a legacy/degraded forge PASS.
 
-- **All APPROVE** → panel passed. ⟨state: approved is set only now⟩
-- **Any REJECT** → revise the plan addressing every finding (the PostToolUse hook resets approvals when you edit the plan), increment `critics.round`, re-dispatch the FULL panel. Findings you disagree with are answered in a `## Critic Responses` section of the plan, not ignored.
-- **Round > 3** → stop, present the deadlock to the user with the unresolved findings. ⟨state: awaiting-user⟩
+- **All APPROVE** → request the legal journal transition to approved; the hook projects it only after all current-generation receipts validate.
+- **Any REJECT** → revise the plan addressing every finding. The tracked edit creates the next sealed generation and invalidates approvals; re-dispatch the FULL panel using the next positive forge round. Findings you disagree with are answered in a `## Critic Responses` section, not ignored.
+- **Round > 3** → present the deadlock only after structural question proof permits the legal awaiting-user transition.
 
 ### Phase 5: Present and Hand Off ⟨state: awaiting-user⟩
 
