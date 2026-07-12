@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "dispatchId": "123e4567-e89b-42d3-a456-426614174001",
+  "role": "security-reviewer",
+  "evidencePath": ".glm-hammer/evidence/reviews/security.md",
+  "sourceSnapshotSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

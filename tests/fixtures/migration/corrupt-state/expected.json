@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "code": "MIGRATION_CORRUPT",
+  "journalEvents": 0,
+  "quarantinePreservesBytes": true
+}

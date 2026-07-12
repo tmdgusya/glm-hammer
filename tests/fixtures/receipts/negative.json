@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    { "name": "missing", "code": "RCPT_HEADER_MISSING" },
+    { "name": "duplicate", "code": "RCPT_HEADER_DUPLICATE" },
+    { "name": "order", "code": "RCPT_HEADER_ORDER" },
+    { "name": "role-path", "code": "RCPT_ROLE_PATH" },
+    { "name": "generation", "code": "RCPT_GENERATION" }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "event": "UserPromptSubmit",
+  "payloadShape": {
+    "cwd": "string",
+    "hookEventName": "string",
+    "hook_event_name": "string",
+    "mode": "string",
+    "prompt": "string",
+    "sessionId": "string",
+    "session_id": "string",
+    "timestamp": "string",
+    "traceId": "string",
+    "turnId": "string"
+  },
+  "sourceKind": "live-capture"
+}

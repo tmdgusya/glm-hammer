@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "engineIdentity": {
+    "name": "zcode-cli",
+    "version": "0.15.2",
+    "artifactSha256": "0f2ab95e39876fd639a15eb207fd42ca692d145f44ae5093714071a07de9c16e"
+  },
+  "sanitizerVersion": "runtime-capture-v1",
+  "fixtures": [
+    {
+      "name": "agent-task-post-tool-use",
+      "event": "PostToolUse",
+      "status": "supported",
+      "sourceKind": "live-capture",
+      "sourceRef": "1783832550483-164827-PostToolUse.json",
+      "sourceSha256": "7edc25cae2a2b7cfe3302d4c8d2497c73b2b9d33a23f62c0e95b7139a2c6b6d0",
+      "fixturePath": "tests/fixtures/runtime/agent-task-post-tool-use.json",
+      "fixtureSha256": "151e83657fb59ed498a9b9fe0fe6ac6538a32427506978cebb45d2a210dba914",
+      "retainedFields": [
+        "event",
+        "payloadShape",
+        "sourceKind"
+      ],
+      "notes": "Sanitized exact-artifact live capture."
+    },
+    {
+      "name": "ask-user-question",
+      "event": "AskUserQuestion",
+      "status": "unsupported",
+      "sourceKind": "built-in-guide",
+      "sourceRef": "zcode-guide/diagnosing-hooks/SKILL.md",
+      "sourceSha256": null,
+      "fixturePath": null,
+      "fixtureSha256": null,
+      "retainedFields": [],
+      "notes": "Not observed; grants no release credit."
+    },
+    {
+      "name": "bash-tool",
+      "event": "Bash",
+      "status": "unsupported",
+      "sourceKind": "built-in-guide",
+      "sourceRef": "zcode-guide/diagnosing-hooks/SKILL.md",
+      "sourceSha256": null,
+      "fixturePath": null,
+      "fixtureSha256": null,
+      "retainedFields": [],
+      "notes": "Not observed; F11 remains OPEN."
+    },
+    {
+      "name": "parallel-agent-task-post-tool-use",
+      "event": "PostToolUse",
+      "status": "supported",
+      "sourceKind": "live-capture",
+      "sourceRef": "1783832597740-165885-PostToolUse.json,1783832598122-165899-PostToolUse.json",
+      "sourceSha256": "44cb246ca41b963a9f659bd444c5063b8f7b125c37f83e362ea6de6db456d09f",
+      "fixturePath": "tests/fixtures/runtime/parallel-agent-task-post-tool-use.json",
+      "fixtureSha256": "20d9a17776bff4ee0a38f8467913adb1ba19adb2797b0fcf9a0b0118db2845f3",
+      "retainedFields": [
+        "event",
+        "payloadShape",
+        "sourceKind"
+      ],
+      "notes": "Two sanitized near-concurrent exact-artifact live captures."
+    },
+    {
+      "name": "session-start-compact",
+      "event": "SessionStart",
+      "status": "supported",
+      "sourceKind": "live-capture",
+      "sourceRef": "1783832572766-165331-SessionStart.json",
+      "sourceSha256": "cd10772bad2ded555c42e2003bf39cefb7427f5374ef126b4cf3fc903b88318d",
+      "fixturePath": "tests/fixtures/runtime/session-start-compact.json",
+      "fixtureSha256": "260a7d496a19482091261a6961cc1e280eed14a1d13ca620c667164113595a3d",
+      "retainedFields": [
+        "event",
+        "payloadShape",
+        "sourceKind"
+      ],
+      "notes": "Sanitized compact SessionStart live capture."
+    },
+    {
+      "name": "session-start-normal",
+      "event": "SessionStart",
+      "status": "supported",
+      "sourceKind": "live-capture",
+      "sourceRef": "1783832545563-164732-SessionStart.json",
+      "sourceSha256": "bd89bd32b98600889d666450cd051630ce666563b41e90ca20ac04807a7d4f14",
+      "fixturePath": "tests/fixtures/runtime/session-start-normal.json",
+      "fixtureSha256": "43aec4c9647feb5a0fe528d6a536f5f84e39df360507becf6e993cf0efa2d4f2",
+      "retainedFields": [
+        "event",
+        "payloadShape",
+        "sourceKind"
+      ],
+      "notes": "Sanitized normal SessionStart live capture."
+    },
+    {
+      "name": "stop",
+      "event": "Stop",
+      "status": "supported",
+      "sourceKind": "live-capture",
+      "sourceRef": "1783832553341-164883-Stop.json,1783832600486-165944-Stop.json",
+      "sourceSha256": "ce16298f13e5d7b7987d298211962d00610eb7df157129a2b918d5cdaa7122fe",
+      "fixturePath": "tests/fixtures/runtime/stop.jsonl",
+      "fixtureSha256": "672b10cb03b877f1d9b4aecc5ff0c79105fbd3845e64ee46774f4bb5f32a039e",
+      "retainedFields": [
+        "event",
+        "payloadShape",
+        "sourceKind"
+      ],
+      "notes": "Two sanitized Stop captures with response and transcript shape evidence."
+    },
+    {
+      "name": "user-prompt-submit",
+      "event": "UserPromptSubmit",
+      "status": "supported",
+      "sourceKind": "live-capture",
+      "sourceRef": "1783832545584-164739-UserPromptSubmit.json",
+      "sourceSha256": "42605fd6ffeb289e53c02cd8ffc80d9653215f1d8aae9e861306c4a277a1bed6",
+      "fixturePath": "tests/fixtures/runtime/user-prompt-submit.json",
+      "fixtureSha256": "a223d21d75fbbabcbaab5107f984191765319e0705459b8701796a5b8a7b7e9b",
+      "retainedFields": [
+        "event",
+        "payloadShape",
+        "sourceKind"
+      ],
+      "notes": "Sanitized exact-artifact live capture."
+    }
+  ]
+}

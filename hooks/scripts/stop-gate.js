@@ -430,6 +430,23 @@ function pptxxGate(cwd, state) {
 
   return null;
 }
+function coreCommonGuard(cwd, state) {
+  const journal = require('./lib').readJournal(cwd);
+  if (!journal.ok) return `Core gate: journal authority is invalid (${journal.code}).`;
+  if (journal.events.length === 0) return 'Core gate: authoritative journal is missing for a non-idle core run.';
+  const runEvents = journal.events.filter((event) => event.runId === state.runId);
+  if (runEvents.some((event) => event.type === 'RUN_COMPLETED' || event.type === 'RUN_ENDED_UNVERIFIED')) return null;
+  if (state.status === 'awaiting-user') {
+    if (runEvents.some((event) => event.type === 'USER_QUESTION_OBSERVED' &&
+      !runEvents.some((terminal) => terminal.type === 'RUN_ENDED_UNVERIFIED' &&
+        terminal.payload.questionProofEventId === event.eventId))) return null;
+    return 'Core gate: awaiting-user requires an approved unconsumed structural question proof.';
+  }
+  if (state.phase === 'forge') return forgeGate(cwd, state);
+  if (state.phase === 'hammer') return hammerGate(cwd, state);
+  return `Core gate: unsupported core phase ${state.phase}.`;
+}
+
 
 try {
   const input = readStdin();
@@ -437,17 +454,20 @@ try {
   const state = readState(cwd);
 
   if (!state || !state.phase || state.phase === 'idle') process.exit(0);
-  if (state.status === 'awaiting-user') process.exit(0);
-  if (underContextPressure(input.transcript_path)) process.exit(0);
-
-  const blocks = state.stopBlocks || 0;
-  if (blocks >= BLOCK_CAP) process.exit(0); // yield; router/session-start reset the counter
-
+  const core = state.schemaVersion === 1 && typeof state.runId === 'string' && Number.isSafeInteger(state.generation);
   let reason = null;
-  if (state.phase === 'forge' && state.status !== 'done') reason = forgeGate(cwd, state);
-  else if (state.phase === 'crucible' && state.status !== 'done') reason = crucibleGate(cwd, state);
-  else if (state.phase === 'hammer') reason = hammerGate(cwd, state); // "done" is re-verified against receipts
-  else if (state.phase === 'pptxx') reason = pptxxGate(cwd, state); // "done" is hybrid: re-verified while state.deck exists
+  let blocks = state.stopBlocks || 0;
+  if (core) {
+    reason = coreCommonGuard(cwd, state);
+  } else {
+    if (state.status === 'awaiting-user') process.exit(0);
+    if (underContextPressure(input.transcript_path)) process.exit(0);
+    if (blocks >= BLOCK_CAP) process.exit(0);
+    if (state.phase === 'forge' && state.status !== 'done') reason = forgeGate(cwd, state);
+    else if (state.phase === 'crucible' && state.status !== 'done') reason = crucibleGate(cwd, state);
+    else if (state.phase === 'hammer') reason = hammerGate(cwd, state);
+    else if (state.phase === 'pptxx') reason = pptxxGate(cwd, state);
+  }
 
   if (!reason) process.exit(0);
 

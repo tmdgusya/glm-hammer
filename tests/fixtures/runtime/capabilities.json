@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "engineIdentity": {
+    "name": "zcode-cli",
+    "version": "0.15.2",
+    "artifactSha256": "0f2ab95e39876fd639a15eb207fd42ca692d145f44ae5093714071a07de9c16e"
+  },
+  "manifestSha256": "0068fb81665c4591fc1ff89e52d1a74c4e868a90d710bcb78429357f4d18e56a",
+  "questionObserver": "stop-transcript",
+  "capabilities": {
+    "AskUserQuestion": {
+      "status": "unsupported",
+      "fixtureName": "ask-user-question",
+      "requiredFields": [],
+      "consumers": [
+        "coreCommonGuard"
+      ],
+      "fallback": "stop-transcript"
+    },
+    "Bash": {
+      "status": "unsupported",
+      "fixtureName": "bash-tool",
+      "requiredFields": [],
+      "consumers": [
+        "F11"
+      ],
+      "fallback": "open"
+    },
+    "Stop": {
+      "status": "supported",
+      "fixtureName": "stop",
+      "requiredFields": [
+        "responsePreview",
+        "responseText",
+        "transcriptPath",
+        "transcript_path",
+        "toolCallCount"
+      ],
+      "consumers": [
+        "coreCommonGuard"
+      ],
+      "fallback": "unavailable"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+'use strict';
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const lib = require('../hooks/scripts/lib');
+const root = path.resolve(__dirname, '..');
+function copyFixture(name) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'glm-migration-'));
+  const source = path.join(root, 'tests', 'fixtures', 'migration', name);
+  const stateDir = path.join(tmp, '.glm-hammer');
+  fs.mkdirSync(stateDir, { recursive: true });
+  fs.copyFileSync(path.join(source, 'state.json'), path.join(stateDir, 'state.json'));
+  const seal = path.join(source, 'plan-seal.json');
+  if (fs.existsSync(seal)) fs.copyFileSync(seal, path.join(stateDir, 'plan-seal.json'));
+  return tmp;
+}
+const valid = copyFixture('legacy-core-run');
+fs.copyFileSync(path.join(root, 'tests/fixtures/migration/legacy-core-run/plan-seal.json'), path.join(valid, '.glm-hammer/plan-seal.json'));
+const migrated = lib.migrateLegacyCoreRun(valid, { runId: '123e4567-e89b-42d3-a456-426614174000' });
+if (!migrated.ok || !migrated.migrated || migrated.event.payload.migrationCode !== 'FRESH_REDISPATCH_REQUIRED') throw new Error('valid migration failed');
+const projected = lib.readState(valid);
+if (projected.status !== 'migration-required' || projected.verification !== 'UNVERIFIED' || projected.tasks || projected.reviews) throw new Error('legacy approval credit survived');
+if (lib.readJournal(valid).events.length !== 1) throw new Error('migration event missing');
+fs.rmSync(valid, { recursive: true, force: true });
+const corrupt = copyFixture('corrupt-state');
+fs.writeFileSync(path.join(corrupt, '.glm-hammer/plan-seal.json'), '{}\n');
+const before = fs.readFileSync(path.join(corrupt, '.glm-hammer/state.json'));
+const rejected = lib.migrateLegacyCoreRun(corrupt);
+if (rejected.ok || rejected.code !== 'MIGRATION_CORRUPT' || lib.readJournal(corrupt).events.length !== 0) throw new Error('corrupt migration did not fail closed');
+const copies = fs.readdirSync(path.join(corrupt, '.glm-hammer/quarantine'));
+if (copies.length !== 1 || !fs.readFileSync(path.join(corrupt, '.glm-hammer/quarantine', copies[0])).equals(before)) throw new Error('quarantine changed source bytes');
+fs.rmSync(corrupt, { recursive: true, force: true });
+process.stdout.write('MIGRATION_CONTRACT_OK\n');

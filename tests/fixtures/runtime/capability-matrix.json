@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "engineIdentity": {
+    "name": "zcode-cli",
+    "version": "0.15.2",
+    "artifactSha256": "0f2ab95e39876fd639a15eb207fd42ca692d145f44ae5093714071a07de9c16e"
+  },
+  "observedEvents": ["SessionStart", "UserPromptSubmit", "PostToolUse", "Stop"],
+  "supportedZCodeEvents": ["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "PostToolUseFailure", "Stop"],
+  "questionObserver": "stop-transcript",
+  "f11": "OPEN",
+  "captureSessionId": "sess_7cdacece-5f93-41b4-bd75-6e3a8c88b487"
+}

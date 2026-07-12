@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    { "name": "bom", "mutation": "bom", "code": "PLAN_ENCODING" },
+    { "name": "crlf", "mutation": "crlf", "code": "PLAN_ENCODING" },
+    { "name": "missing-baseline", "mutation": "missing-baseline", "code": "PLAN_PATH_BASELINE_MISSING" },
+    { "name": "checked-acceptance", "mutation": "checked-acceptance", "code": "PLAN_ACCEPTANCE" },
+    { "name": "noncontiguous-task", "mutation": "noncontiguous-task", "code": "PLAN_TASKS" },
+    { "name": "noncontiguous-step", "mutation": "noncontiguous-step", "code": "PLAN_STEPS" }
+  ]
+}

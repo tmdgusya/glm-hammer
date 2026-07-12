@@ -27,8 +27,13 @@ cat >"$PLUGIN_DIR/capture-hook.js" <<'JS'
 'use strict';
 const fs = require('fs');
 const path = require('path');
-let input = {};
-try { const raw = fs.readFileSync(0, 'utf8'); input = raw ? JSON.parse(raw) : {}; } catch {}
+let input;
+try {
+  const raw = fs.readFileSync(0, 'utf8');
+  input = raw ? JSON.parse(raw) : {};
+} catch {
+  process.exit(1);
+}
 const event = process.argv[2];
 const safe = {
   event,

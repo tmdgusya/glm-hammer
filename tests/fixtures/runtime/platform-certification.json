@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "engineIdentity": {
+    "name": "zcode-cli",
+    "version": "0.15.2",
+    "artifactSha256": "0f2ab95e39876fd639a15eb207fd42ca692d145f44ae5093714071a07de9c16e"
+  },
+  "os": {
+    "platform": "linux",
+    "release": "7.0.0-27-generic",
+    "arch": "x64",
+    "nodeVersion": "v22.17.0"
+  },
+  "fsKind": "local",
+  "localSingleHost": true,
+  "journalSchemaVersion": 1,
+  "testScriptSha256": "b0e6c43306c80c9ecfabcbe77bc168632290c38e402ab0674d8edf9078d2d6c8",
+  "capabilitiesSha256": "b5c9a69fb328ba5657e5b6a5650fa7769456a55ac0b51f3016473dfbd17f8bab",
+  "result": {
+    "path": "tests/fixtures/runtime/journal-stress-result.json",
+    "sha256": "b950f33877a815cdfc2f6edd9d6102dbb1780bbd9ca9700c3cc1ff955c19eef0"
+  },
+  "reviewerId": "local-operator",
+  "status": "APPROVE"
+}

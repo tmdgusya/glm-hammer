@@ -1,0 +1,7 @@
+{
+  "phase": "hammer",
+  "status": "approved",
+  "plan": "tests/fixtures/migration/legacy-core-run/plan.md",
+  "tasks": { "total": 1, "completed": 1 },
+  "reviews": { "security": "pass", "qa": "pass" }
+}
